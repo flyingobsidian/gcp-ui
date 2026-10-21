@@ -116,3 +116,26 @@ build time.
 - Cached entries older than 10 minutes are shown immediately and refreshed in
   the background.
 - **⟳** clears the cache and reloads everything.
+
+## Service picker
+
+- The service box sits right of the project box. Tab moves project → service →
+  command → Run. Tab closes an open popup on the way.
+- Picking a project moves focus to the service box if no service is chosen
+  yet.
+- The popup has two tabs:
+  - **Frequent**: starred services plus any you have used, most used first.
+    Buckets, VMs, MIGs, Schedules and Workflows start starred.
+  - **All**: the whole catalogue, grouped by category.
+- Typing filters the current tab. If nothing in Frequent matches, the popup
+  switches to All. ↑/↓ and Enter pick.
+- ☆/★ stars or unstars a service. Starred services always appear in Frequent.
+- Picking a service fills the command line with its read-only `list` command
+  and runs it for the chosen project.
+- Some services need a location (Schedules, Workflows, Tasks, Redis, Dataproc,
+  KMS, Cloud Deploy). The first time, the command stops at `--location=` for
+  you to type one. After that, the last location you used is filled in
+  automatically.
+- Switching project re-runs the current command, but only if it is exactly a
+  catalogue `list` command. Hand-typed commands never re-run on their own.
+- Use counts, stars and locations are stored in `localStorage`.
