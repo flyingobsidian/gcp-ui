@@ -5,7 +5,9 @@ export interface RunState {
   running: boolean;
   response?: RunResponse;
   roundTripMs?: number;
+  // project and args are those of the run that produced response.
   project?: string;
+  args?: string[];
   error: string;
 }
 
@@ -24,7 +26,7 @@ export function useGcloudRun() {
     try {
       const response = await runGcloud(args, project, ctl.signal);
       if (abort.current === ctl) {
-        setState({ running: false, error: "", response, project, roundTripMs: Math.round(performance.now() - started) });
+        setState({ running: false, error: "", response, project, args, roundTripMs: Math.round(performance.now() - started) });
       }
     } catch (err) {
       if (!ctl.signal.aborted) setState((s) => ({ ...s, running: false, error: errorText(err) }));

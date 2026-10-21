@@ -1,4 +1,7 @@
 import type { ComponentChildren, RefObject } from "preact";
+import { useMemo } from "preact/hooks";
+import { linkerFor } from "../consoleLinks.ts";
+import { matchCommand } from "../services.ts";
 import type { RunState } from "../useGcloudRun.ts";
 import { JsonView } from "./JsonView.tsx";
 
@@ -21,6 +24,12 @@ export function CommandPane({ pickers, command, onCommand, onRun, run, commandRe
   };
 
   const out = run.response;
+  // Links are derived from the command that produced the output, not from
+  // whatever is currently typed in the command line.
+  const linkFor = useMemo(
+    () => linkerFor(run.args ? matchCommand(run.args)?.service.id : undefined, run.project ?? ""),
+    [run.args, run.project],
+  );
   return (
     <section class="pane">
       <form class="command" onSubmit={submit}>
@@ -45,7 +54,7 @@ export function CommandPane({ pickers, command, onCommand, onRun, run, commandRe
         ].join(""))}
       </div>
       <div class="output">
-        {out && <JsonView value={out.output !== undefined ? out.output : out.outputText ?? ""} />}
+        {out && <JsonView value={out.output !== undefined ? out.output : out.outputText ?? ""} linkFor={linkFor} />}
       </div>
     </section>
   );
