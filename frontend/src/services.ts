@@ -1,3 +1,5 @@
+import { splitArgs } from "./args.ts";
+
 // The service catalogue: read-only gcloud list commands, one per resource
 // type. Commands follow Python gcloud semantics. Services whose list command
 // needs a location record the flag; the picker fills in the location last
@@ -102,6 +104,37 @@ export function matchCommand(args: readonly string[]): { service: Service; locat
     if (last.startsWith(prefix)) return { service: s, location: last.slice(prefix.length) };
   }
   return undefined;
+}
+
+export interface CatalogueCommand {
+  service: Service;
+  location: string;
+  args: string[];
+  // runnable is true when the command needs no further input: a location,
+  // if required, is present and well-formed.
+  runnable: boolean;
+}
+
+// isValidLocation accepts region or zone names such as "europe-west2" or
+// "us-central1-a".
+export function isValidLocation(s: string): boolean {
+  return /^[a-z][a-z0-9-]{1,62}$/.test(s);
+}
+
+// catalogueCommand recognises command-line text that is exactly a catalogue
+// list command. Only such read-only commands are ever run automatically (on
+// picking a service or switching project).
+export function catalogueCommand(text: string): CatalogueCommand | undefined {
+  let args: string[];
+  try {
+    args = splitArgs(text);
+  } catch {
+    return undefined;
+  }
+  if (args[0] === "gcloud") args = args.slice(1);
+  const m = matchCommand(args);
+  if (!m) return undefined;
+  return { ...m, args, runnable: !m.service.locationFlag || isValidLocation(m.location) };
 }
 
 // filterServices returns services matching every whitespace-separated token

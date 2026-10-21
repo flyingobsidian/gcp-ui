@@ -4,17 +4,10 @@
 // float to the top.
 
 import type { StorageLike } from "./cache.ts";
-import { DEFAULT_STARRED, SERVICES, type Service } from "./services.ts";
+import { DEFAULT_STARRED, isValidLocation, SERVICES, type Service } from "./services.ts";
 
 const KEY = "gcpui:services";
 export const MAX_FREQUENT = 12;
-
-// Locations are region or zone names such as "europe-west2" or "us-central1-a".
-const LOCATION = /^[a-z][a-z0-9-]{1,62}$/;
-
-export function isValidLocation(s: string): boolean {
-  return LOCATION.test(s);
-}
 
 interface Saved {
   counts: Record<string, number>;

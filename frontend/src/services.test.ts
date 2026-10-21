@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildCommand, DEFAULT_STARRED, filterServices, matchCommand, SERVICES, serviceById } from "./services.ts";
-import { isValidLocation, MAX_FREQUENT, ServicePrefs } from "./servicePrefs.ts";
+import {
+  buildCommand, catalogueCommand, DEFAULT_STARRED, filterServices, isValidLocation, matchCommand, SERVICES, serviceById,
+} from "./services.ts";
+import { MAX_FREQUENT, ServicePrefs } from "./servicePrefs.ts";
 import type { StorageLike } from "./cache.ts";
 
 class MemStorage implements StorageLike {
@@ -45,6 +47,17 @@ test("matchCommand round-trips and extracts location", () => {
   assert.equal(matchCommand(["compute", "instances", "list", "--filter=x"]), undefined);
   assert.equal(matchCommand(["scheduler", "jobs", "list", "--region=x"]), undefined);
   assert.equal(matchCommand(["compute", "instances", "delete", "vm-1"]), undefined);
+});
+
+test("catalogueCommand only recognises complete catalogue list commands", () => {
+  assert.equal(catalogueCommand("storage buckets list")?.runnable, true);
+  assert.equal(catalogueCommand("gcloud  storage buckets list ")?.service.id, "buckets");
+  assert.equal(catalogueCommand("scheduler jobs list --location=")?.runnable, false);
+  assert.equal(catalogueCommand("scheduler jobs list --location=europe-west2")?.runnable, true);
+  assert.equal(catalogueCommand("scheduler jobs list --location='x;y'")?.runnable, false);
+  for (const not of ["", "storage buckets delete gs://b", "storage buckets list --filter=x", "compute instances list \"oops"]) {
+    assert.equal(catalogueCommand(not), undefined, not);
+  }
 });
 
 test("filterServices", () => {
