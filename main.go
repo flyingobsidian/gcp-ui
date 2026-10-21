@@ -1,5 +1,7 @@
 // Command gcp-ui serves a localhost-only web UI for GCP and an API that passes
-// commands through to gcloud with JSON output.
+// commands through to gcloud with JSON output. gcloud is gcloud-go, linked
+// into this binary: each command runs in a re-executed copy of gcp-ui (see
+// internal/gcloudgo).
 package main
 
 import (
@@ -11,7 +13,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strconv"
 	"syscall"
@@ -20,6 +21,7 @@ import (
 	"github.com/flyingobsidian/gcp-ui/internal/api"
 	"github.com/flyingobsidian/gcp-ui/internal/config"
 	"github.com/flyingobsidian/gcp-ui/internal/gcloud"
+	"github.com/flyingobsidian/gcp-ui/internal/gcloudgo"
 	"github.com/flyingobsidian/gcp-ui/internal/httpmw"
 	"github.com/flyingobsidian/gcp-ui/internal/session"
 	"github.com/flyingobsidian/gcp-ui/internal/web"
@@ -28,6 +30,9 @@ import (
 const shutdownTimeout = 5 * time.Second
 
 func main() {
+	if gcloudgo.IsChild() {
+		os.Exit(gcloudgo.Main())
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "gcp-ui:", err)
 		os.Exit(1)
@@ -44,9 +49,9 @@ func run() error {
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
-	gcloudPath, err := exec.LookPath(cfg.GcloudPath)
+	self, err := gcloudgo.Executable()
 	if err != nil {
-		return fmt.Errorf("find gcloud: %w", err)
+		return err
 	}
 	token, err := session.NewToken()
 	if err != nil {
@@ -54,7 +59,7 @@ func run() error {
 	}
 	cookieName := session.CookieName(cfg.APIPort)
 
-	runner := gcloud.NewRunner(gcloudPath, cfg.CommandTimeout, cfg.MaxConcurrent)
+	runner := gcloud.NewRunner(self, gcloudgo.ChildEnv(), cfg.CommandTimeout, cfg.MaxConcurrent)
 	apiHandler := api.NewHandler(runner, api.Options{
 		Token:          token,
 		CookieName:     cookieName,
@@ -99,7 +104,7 @@ func run() error {
 	logger.Info("gcp-ui ready",
 		"web", servers[0].srv.Addr,
 		"api", servers[1].srv.Addr,
-		"gcloud", gcloudPath)
+		"gcloud_go", gcloudgo.Version())
 	// The token goes in the fragment, which browsers never send to a server,
 	// so it stays out of request lines, logs and Referer headers.
 	fmt.Fprintf(os.Stderr, "\nopen http://%s/#%s\n\n",

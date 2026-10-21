@@ -17,7 +17,6 @@ type Config struct {
 	BindHost       string
 	WebPort        int
 	APIPort        int
-	GcloudPath     string
 	CommandTimeout time.Duration
 	MaxConcurrent  int
 }
@@ -27,7 +26,6 @@ const (
 	DefaultBindHost       = "127.0.0.1"
 	DefaultWebPort        = 8080
 	DefaultAPIPort        = 32000
-	DefaultGcloudPath     = "gcloud"
 	DefaultCommandTimeout = 2 * time.Minute
 	DefaultMaxConcurrent  = 8
 )
@@ -50,7 +48,6 @@ func Load(args []string, getenv func(string) string, output io.Writer) (Config, 
 	fs.StringVar(&cfg.BindHost, "bind", defaults.BindHost, "loopback address to listen on (env GCPUI_BIND)")
 	fs.IntVar(&cfg.WebPort, "web-port", defaults.WebPort, "port serving the web UI (env GCPUI_WEB_PORT)")
 	fs.IntVar(&cfg.APIPort, "api-port", defaults.APIPort, "port serving the gcloud API (env GCPUI_API_PORT)")
-	fs.StringVar(&cfg.GcloudPath, "gcloud", defaults.GcloudPath, "gcloud binary name or path (env GCPUI_GCLOUD)")
 	fs.DurationVar(&cfg.CommandTimeout, "timeout", defaults.CommandTimeout, "per-command timeout (env GCPUI_TIMEOUT)")
 	fs.IntVar(&cfg.MaxConcurrent, "max-concurrent", defaults.MaxConcurrent, "maximum concurrent gcloud processes (env GCPUI_MAX_CONCURRENT)")
 	if err := fs.Parse(args); err != nil {
@@ -70,15 +67,11 @@ func envDefaults(getenv func(string) string) (Config, error) {
 		BindHost:       DefaultBindHost,
 		WebPort:        DefaultWebPort,
 		APIPort:        DefaultAPIPort,
-		GcloudPath:     DefaultGcloudPath,
 		CommandTimeout: DefaultCommandTimeout,
 		MaxConcurrent:  DefaultMaxConcurrent,
 	}
 	if v := getenv("GCPUI_BIND"); v != "" {
 		cfg.BindHost = v
-	}
-	if v := getenv("GCPUI_GCLOUD"); v != "" {
-		cfg.GcloudPath = v
 	}
 	for _, e := range []struct {
 		name string
@@ -122,9 +115,6 @@ func (c Config) validate() error {
 	}
 	if c.WebPort == c.APIPort {
 		return fmt.Errorf("%w: web port and api port must differ (both %d)", ErrInvalid, c.WebPort)
-	}
-	if c.GcloudPath == "" {
-		return fmt.Errorf("%w: gcloud path is empty", ErrInvalid)
 	}
 	if c.CommandTimeout <= 0 {
 		return fmt.Errorf("%w: timeout must be positive", ErrInvalid)

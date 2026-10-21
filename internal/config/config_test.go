@@ -21,7 +21,6 @@ func TestLoadDefaults(t *testing.T) {
 		BindHost:       DefaultBindHost,
 		WebPort:        DefaultWebPort,
 		APIPort:        DefaultAPIPort,
-		GcloudPath:     DefaultGcloudPath,
 		CommandTimeout: DefaultCommandTimeout,
 		MaxConcurrent:  DefaultMaxConcurrent,
 	}
@@ -35,7 +34,6 @@ func TestLoadEnvThenFlags(t *testing.T) {
 		"GCPUI_WEB_PORT":       "9000",
 		"GCPUI_API_PORT":       "9001",
 		"GCPUI_TIMEOUT":        "30s",
-		"GCPUI_GCLOUD":         "/opt/gcloud",
 		"GCPUI_MAX_CONCURRENT": "3",
 	})
 	cfg, err := Load([]string{"--api-port", "9100"}, e, io.Discard)
@@ -43,7 +41,7 @@ func TestLoadEnvThenFlags(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 	if cfg.WebPort != 9000 || cfg.APIPort != 9100 || cfg.CommandTimeout != 30*time.Second ||
-		cfg.GcloudPath != "/opt/gcloud" || cfg.MaxConcurrent != 3 {
+		cfg.MaxConcurrent != 3 {
 		t.Errorf("unexpected config %+v", cfg)
 	}
 }
