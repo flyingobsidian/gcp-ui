@@ -1,14 +1,17 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import type { Container, Project } from "../hierarchy.ts";
 import { highlight, MAX_RESULTS, searchProjects } from "../search.ts";
 import { ORPHANS, type HierarchyStore } from "../store.ts";
 import { useStore } from "../useStore.ts";
+import { PopupTabs, usePopup } from "./popup.tsx";
 
 interface Props {
   store: HierarchyStore;
   selected: string;
   onSelect: (projectId: string) => void;
+  // onPicked runs after a project is picked (not cleared), e.g. to move focus on.
+  onPicked?: () => void;
 }
 
 type Tab = "search" | "tree";
@@ -16,18 +19,14 @@ type Tab = "search" | "tree";
 // ProjectPicker is a single box showing the chosen project. Focusing or
 // typing in it opens a popup with two tabs: filtered search results and the
 // organization/folder tree.
-export function ProjectPicker({ store, selected, onSelect }: Props) {
+export function ProjectPicker({ store, selected, onSelect, onPicked }: Props) {
   useStore(store);
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [tab, setTab] = useState<Tab>("tree");
+  const p = usePopup<Tab>("tree");
   const [active, setActive] = useState(0);
-  const root = useRef<HTMLDivElement>(null);
-  const input = useRef<HTMLInputElement>(null);
 
   const projects = store.allProjects.data ?? [];
-  const matches = useMemo(() => searchProjects(projects, query), [projects, query]);
-  useEffect(() => setActive(0), [query]);
+  const matches = useMemo(() => searchProjects(projects, p.query), [projects, p.query]);
+  useEffect(() => setActive(0), [p.query]);
 
   // "/" focuses the box from anywhere outside a text field.
   useEffect(() => {
@@ -35,67 +34,36 @@ export function ProjectPicker({ store, selected, onSelect }: Props) {
       const t = e.target as HTMLElement | null;
       if (e.key === "/" && !(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) {
         e.preventDefault();
-        input.current?.focus();
+        p.box.current?.focus();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // A click anywhere outside the picker closes the popup.
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (!root.current?.contains(e.target as Node)) close();
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
-  const openPopup = () => {
-    if (open) return;
-    setOpen(true);
-    setQuery("");
-    setTab("tree");
-  };
-
-  const close = () => {
-    setOpen(false);
-    setQuery("");
-  };
-
   const choose = (projectId: string) => {
     onSelect(projectId);
-    close();
-    input.current?.blur();
-  };
-
-  const showTab = (t: Tab) => {
-    setTab(t);
-    input.current?.focus();
+    p.close();
+    p.box.current?.blur();
+    if (projectId) onPicked?.();
   };
 
   const onInput = (value: string) => {
-    setOpen(true);
-    setQuery(value);
-    setTab(value.trim() ? "search" : "tree");
+    p.setOpen(true);
+    p.setQuery(value);
+    p.setTab(value.trim() ? "search" : "tree");
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      close();
-      input.current?.blur();
-      return;
-    }
+    if (p.baseKeyDown(e)) return;
     if (e.key === "Enter") {
       // Never let Enter submit the surrounding command form.
       e.preventDefault();
-      const m = tab === "search" ? matches[active] : undefined;
+      const m = p.tab === "search" ? matches[active] : undefined;
       if (m) choose(m.project.projectId);
       return;
     }
-    if (tab !== "search") return;
+    if (p.tab !== "search") return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActive((i) => Math.min(i + 1, matches.length - 1));
@@ -109,40 +77,39 @@ export function ProjectPicker({ store, selected, onSelect }: Props) {
     store.orgs.refreshing || store.allProjects.refreshing;
 
   return (
-    <div class="picker" ref={root}>
+    <div class="picker" ref={p.root}>
       <input
-        ref={input}
+        ref={p.box}
         class={`picker-box ${selected ? "" : "none"}`}
-        value={open ? query : selected}
-        placeholder={open ? (selected || `search ${projects.length || ""} projects`) : "choose project ( / )"}
+        value={p.open ? p.query : selected}
+        placeholder={p.open ? (selected || `search ${projects.length || ""} projects`) : "choose project ( / )"}
         title={selected ? `Project: ${selected}` : "No project selected"}
-        onFocus={openPopup}
-        onClick={openPopup}
+        aria-label="Project"
+        onFocus={p.openPopup}
+        onClick={p.openPopup}
         onInput={(e) => onInput(e.currentTarget.value)}
         onKeyDown={onKeyDown}
         spellcheck={false}
         autocomplete="off"
       />
-      {open && (
+      {p.open && (
         <div class="popup">
-          <div class="tabs" role="tablist">
-            <button type="button" role="tab" aria-selected={tab === "search"} class={tab === "search" ? "on" : ""} onClick={() => showTab("search")}>
-              Search{query.trim() ? ` (${matches.length})` : ""}
-            </button>
-            <button type="button" role="tab" aria-selected={tab === "tree"} class={tab === "tree" ? "on" : ""} onClick={() => showTab("tree")}>
-              Tree
-            </button>
+          <PopupTabs<Tab>
+            tabs={[{ id: "search", label: `Search${p.query.trim() ? ` (${matches.length})` : ""}` }, { id: "tree", label: "Tree" }]}
+            tab={p.tab}
+            onTab={p.showTab}
+          >
             {selected && (
-              <button type="button" class="link" title="Clear the chosen project" onClick={() => choose("")}>clear</button>
+              <button type="button" tabIndex={-1} class="link" title="Clear the chosen project" onClick={() => choose("")}>clear</button>
             )}
-            <button type="button" class="icon" title="Reload organizations, folders and projects" onClick={() => store.refresh()} disabled={busy}>
+            <button type="button" tabIndex={-1} class="icon" title="Reload organizations, folders and projects" onClick={() => store.refresh()} disabled={busy}>
               {busy ? "…" : "⟳"}
             </button>
-          </div>
+          </PopupTabs>
           <div class="popup-body">
-            {tab === "search"
-              ? (query.trim()
-                ? <SearchResults store={store} query={query} matches={matches.map((m) => m.project)} active={active} selected={selected} onPick={(p) => choose(p.projectId)} />
+            {p.tab === "search"
+              ? (p.query.trim()
+                ? <SearchResults store={store} query={p.query} matches={matches.map((m) => m.project)} active={active} selected={selected} onPick={(x) => choose(x.projectId)} />
                 : <p class="muted pad">type to filter {projects.length} projects by ID or name</p>)
               : <Tree store={store} selected={selected} onSelect={choose} />}
           </div>

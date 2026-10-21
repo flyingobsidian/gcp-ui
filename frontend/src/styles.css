@@ -43,7 +43,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 .tabs button { border: none; background: none; padding: 5px 12px; color: var(--muted); }
 .tabs button[role="tab"] { border-bottom: 2px solid transparent; }
 .tabs button[role="tab"].on { color: var(--fg); border-bottom-color: var(--accent); }
-.tabs .link { margin-left: auto; }
+.tab-actions { margin-left: auto; display: flex; }
 .tabs .link:hover { color: var(--fg); }
 .icon { width: 2.4em; padding: 0; }
 .popup-body { overflow: auto; flex: 1; min-height: 0; }
