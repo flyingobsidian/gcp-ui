@@ -23,6 +23,7 @@ case "$1" in
   sleep)   exec sleep 10 ;;
   flood)   while :; do echo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx; done ;;
   prompts) printf '%s' "$CLOUDSDK_CORE_DISABLE_PROMPTS" ;;
+  env)     printf '%s' "$GCPUI_TEST_EXTRA" ;;
 esac
 `
 	path := filepath.Join(t.TempDir(), "gcloud")
@@ -33,7 +34,7 @@ esac
 }
 
 func TestRunSuccess(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), 5*time.Second, 2)
+	r := NewRunner(fakeGcloud(t), nil, 5*time.Second, 2)
 	res, err := r.Run(context.Background(), Request{Args: []string{"json"}})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -44,7 +45,7 @@ func TestRunSuccess(t *testing.T) {
 }
 
 func TestRunInjectsFlags(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), 5*time.Second, 2)
+	r := NewRunner(fakeGcloud(t), nil, 5*time.Second, 2)
 	res, err := r.Run(context.Background(), Request{Args: []string{"echo", "list", "--", "x"}, Project: "my-project-1"})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -57,13 +58,24 @@ func TestRunInjectsFlags(t *testing.T) {
 }
 
 func TestRunDisablesPrompts(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), 5*time.Second, 2)
+	r := NewRunner(fakeGcloud(t), nil, 5*time.Second, 2)
 	res, err := r.Run(context.Background(), Request{Args: []string{"prompts"}})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if string(res.Stdout) != "1" {
 		t.Errorf("CLOUDSDK_CORE_DISABLE_PROMPTS = %q, want 1", res.Stdout)
+	}
+}
+
+func TestRunAddsExtraEnv(t *testing.T) {
+	r := NewRunner(fakeGcloud(t), []string{"GCPUI_TEST_EXTRA=yes"}, 5*time.Second, 2)
+	res, err := r.Run(context.Background(), Request{Args: []string{"env"}})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if string(res.Stdout) != "yes" {
+		t.Errorf("GCPUI_TEST_EXTRA = %q, want yes", res.Stdout)
 	}
 }
 
@@ -81,7 +93,7 @@ func TestRunFailures(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := NewRunner(gcloud, tt.timeout, 1)
+			r := NewRunner(gcloud, nil, tt.timeout, 1)
 			r.maxStdout = 4096
 			_, err := r.Run(context.Background(), Request{Args: tt.args})
 			var gerr *Error
@@ -96,7 +108,7 @@ func TestRunFailures(t *testing.T) {
 }
 
 func TestRunExitStatusKeepsStderr(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), 5*time.Second, 1)
+	r := NewRunner(fakeGcloud(t), nil, 5*time.Second, 1)
 	_, err := r.Run(context.Background(), Request{Args: []string{"fail"}})
 	var gerr *Error
 	if !errors.As(err, &gerr) {
@@ -108,7 +120,7 @@ func TestRunExitStatusKeepsStderr(t *testing.T) {
 }
 
 func TestRunStartFailed(t *testing.T) {
-	r := NewRunner(filepath.Join(t.TempDir(), "missing"), time.Second, 1)
+	r := NewRunner(filepath.Join(t.TempDir(), "missing"), nil, time.Second, 1)
 	_, err := r.Run(context.Background(), Request{Args: []string{"x"}})
 	var gerr *Error
 	if !errors.As(err, &gerr) || gerr.Cause != CauseStartFailed {
@@ -117,7 +129,7 @@ func TestRunStartFailed(t *testing.T) {
 }
 
 func TestRunCancelledWhileQueued(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), 5*time.Second, 1)
+	r := NewRunner(fakeGcloud(t), nil, 5*time.Second, 1)
 	r.sem <- struct{}{} // occupy the only slot
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()

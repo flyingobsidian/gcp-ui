@@ -31,16 +31,19 @@ type Result struct {
 // Runner executes gcloud. It is safe for concurrent use.
 type Runner struct {
 	path      string
+	extraEnv  []string
 	timeout   time.Duration
 	sem       chan struct{}
 	maxStdout int
 }
 
-// NewRunner returns a Runner that executes the binary at path, killing each
-// command after timeout and running at most maxConcurrent at once.
-func NewRunner(path string, timeout time.Duration, maxConcurrent int) *Runner {
+// NewRunner returns a Runner that executes the binary at path with extraEnv
+// ("KEY=value") added to the environment, killing each command after timeout
+// and running at most maxConcurrent at once.
+func NewRunner(path string, extraEnv []string, timeout time.Duration, maxConcurrent int) *Runner {
 	return &Runner{
 		path:      path,
+		extraEnv:  extraEnv,
 		timeout:   timeout,
 		sem:       make(chan struct{}, maxConcurrent),
 		maxStdout: defaultMaxStdout,
@@ -68,6 +71,7 @@ func (r *Runner) Run(ctx context.Context, req Request) (Result, error) {
 	stderr := &cappedBuffer{limit: maxStderr}
 	cmd := exec.CommandContext(runCtx, r.path, req.argv()...)
 	cmd.Env = append(os.Environ(), "CLOUDSDK_CORE_DISABLE_PROMPTS=1")
+	cmd.Env = append(cmd.Env, r.extraEnv...)
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.WaitDelay = waitDelay
