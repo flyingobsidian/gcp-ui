@@ -19,11 +19,33 @@ make run
 | `--web-port` | `GCPUI_WEB_PORT` | `8080` |
 | `--api-port` | `GCPUI_API_PORT` | `32000` |
 | `--bind`     | `GCPUI_BIND`     | `127.0.0.1` (loopback only; anything else is refused) |
-| `--gcloud`   | `GCPUI_GCLOUD`   | `gcloud` on `$PATH` |
 | `--timeout`  | `GCPUI_TIMEOUT`  | `2m` per command |
 | `--max-concurrent` | `GCPUI_MAX_CONCURRENT` | `8` gcloud processes |
 
 Flags override environment variables.
+
+## gcloud
+
+gcp-ui does not use a `gcloud` from `$PATH`. It links
+[gcloud-go](https://github.com/flyingobsidian/gcloud-go) in as a Go module.
+Each command runs in a re-executed copy of the gcp-ui binary, in "gcloud-go
+mode", so commands still run as separate processes with their own timeout. That
+copy is `/proc/self/exe`, so it is always the same build as the running server.
+gcp-ui never accepts gcloud-go's offer to enable a disabled API.
+
+| Command | Effect |
+|---|---|
+| `make gcloud-go-which` | Show which gcloud-go the build uses |
+| `make gcloud-go-update REF=main` | Pin another commit, branch or tag in `go.mod` |
+| `make gcloud-go-local` | Build against the checkout in `../gcloud-go` (or `GCLOUD_GO_DIR=…`) using a gitignored `go.work` |
+| `make gcloud-go-versioned` | Remove `go.work` and go back to the version pinned in `go.mod` |
+
+The gcloud-go version is printed at startup, and is also what
+`GCPUI_RUN_GCLOUD_GO=1 bin/gcp-ui --version` reports.
+
+gcloud-go's tags (e.g. `582.0.0`) are not Go module versions, so `go.mod`
+records a pseudo-version (`v0.0.0-<date>-<commit>`). `REF=582.0.0` still
+works: Go resolves the tag to its commit.
 
 ## API
 
