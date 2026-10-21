@@ -3,3 +3,5 @@
 /frontend/node_modules/
 /internal/web/dist/*
 !/internal/web/dist/.gitkeep
+/go.work
+/go.work.sum
