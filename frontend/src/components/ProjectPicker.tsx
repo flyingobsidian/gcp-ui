@@ -11,17 +11,25 @@ interface Props {
   onSelect: (projectId: string) => void;
 }
 
+type Tab = "search" | "tree";
+
+// ProjectPicker is a single box showing the chosen project. Focusing or
+// typing in it opens a popup with two tabs: filtered search results and the
+// organization/folder tree.
 export function ProjectPicker({ store, selected, onSelect }: Props) {
   useStore(store);
+  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<Tab>("tree");
   const [active, setActive] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
 
   const projects = store.allProjects.data ?? [];
   const matches = useMemo(() => searchProjects(projects, query), [projects, query]);
   useEffect(() => setActive(0), [query]);
 
-  // "/" focuses the search box from anywhere outside a text field.
+  // "/" focuses the box from anywhere outside a text field.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
@@ -34,23 +42,66 @@ export function ProjectPicker({ store, selected, onSelect }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const pick = (p: Project) => {
-    onSelect(p.projectId);
+  // A click anywhere outside the picker closes the popup.
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!root.current?.contains(e.target as Node)) close();
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const openPopup = () => {
+    if (open) return;
+    setOpen(true);
+    setQuery("");
+    setTab("tree");
+  };
+
+  const close = () => {
+    setOpen(false);
     setQuery("");
   };
 
+  const choose = (projectId: string) => {
+    onSelect(projectId);
+    close();
+    input.current?.blur();
+  };
+
+  const showTab = (t: Tab) => {
+    setTab(t);
+    input.current?.focus();
+  };
+
+  const onInput = (value: string) => {
+    setOpen(true);
+    setQuery(value);
+    setTab(value.trim() ? "search" : "tree");
+  };
+
   const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+      input.current?.blur();
+      return;
+    }
+    if (e.key === "Enter") {
+      // Never let Enter submit the surrounding command form.
+      e.preventDefault();
+      const m = tab === "search" ? matches[active] : undefined;
+      if (m) choose(m.project.projectId);
+      return;
+    }
+    if (tab !== "search") return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActive((i) => Math.min(i + 1, matches.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter") {
-      const m = matches[active];
-      if (m) pick(m.project);
-    } else if (e.key === "Escape") {
-      setQuery("");
     }
   };
 
@@ -58,27 +109,46 @@ export function ProjectPicker({ store, selected, onSelect }: Props) {
     store.orgs.refreshing || store.allProjects.refreshing;
 
   return (
-    <nav class="picker">
-      <div class="picker-bar">
-        <input
-          ref={input}
-          class="search"
-          type="search"
-          placeholder={`Search ${projects.length || ""} projects  ( / )`}
-          value={query}
-          onInput={(e) => setQuery(e.currentTarget.value)}
-          onKeyDown={onKeyDown}
-          spellcheck={false}
-          autocomplete="off"
-        />
-        <button class="icon" title="Reload organizations, folders and projects" onClick={() => store.refresh()} disabled={busy}>
-          {busy ? "…" : "⟳"}
-        </button>
-      </div>
-      {query.trim()
-        ? <SearchResults store={store} query={query} matches={matches.map((m) => m.project)} active={active} selected={selected} onPick={pick} />
-        : <Tree store={store} selected={selected} onSelect={onSelect} />}
-    </nav>
+    <div class="picker" ref={root}>
+      <input
+        ref={input}
+        class={`picker-box ${selected ? "" : "none"}`}
+        value={open ? query : selected}
+        placeholder={open ? (selected || `search ${projects.length || ""} projects`) : "choose project ( / )"}
+        title={selected ? `Project: ${selected}` : "No project selected"}
+        onFocus={openPopup}
+        onClick={openPopup}
+        onInput={(e) => onInput(e.currentTarget.value)}
+        onKeyDown={onKeyDown}
+        spellcheck={false}
+        autocomplete="off"
+      />
+      {open && (
+        <div class="popup">
+          <div class="tabs" role="tablist">
+            <button type="button" role="tab" aria-selected={tab === "search"} class={tab === "search" ? "on" : ""} onClick={() => showTab("search")}>
+              Search{query.trim() ? ` (${matches.length})` : ""}
+            </button>
+            <button type="button" role="tab" aria-selected={tab === "tree"} class={tab === "tree" ? "on" : ""} onClick={() => showTab("tree")}>
+              Tree
+            </button>
+            {selected && (
+              <button type="button" class="link" title="Clear the chosen project" onClick={() => choose("")}>clear</button>
+            )}
+            <button type="button" class="icon" title="Reload organizations, folders and projects" onClick={() => store.refresh()} disabled={busy}>
+              {busy ? "…" : "⟳"}
+            </button>
+          </div>
+          <div class="popup-body">
+            {tab === "search"
+              ? (query.trim()
+                ? <SearchResults store={store} query={query} matches={matches.map((m) => m.project)} active={active} selected={selected} onPick={(p) => choose(p.projectId)} />
+                : <p class="muted pad">type to filter {projects.length} projects by ID or name</p>)
+              : <Tree store={store} selected={selected} onSelect={choose} />}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -95,6 +165,7 @@ function SearchResults(props: {
         <li
           key={p.key}
           class={`result ${i === active ? "active" : ""} ${p.projectId === selected ? "selected" : ""}`}
+          ref={i === active ? (el: HTMLLIElement | null) => el?.scrollIntoView({ block: "nearest" }) : undefined}
           onMouseDown={(e) => { e.preventDefault(); onPick(p); }}
         >
           <div class="result-id"><Highlighted text={p.projectId} query={query} /></div>

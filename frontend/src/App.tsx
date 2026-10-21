@@ -34,8 +34,7 @@ export function App() {
 
   return (
     <div class="layout">
-      <ProjectPicker store={store} selected={project} onSelect={select} />
-      <CommandPane project={project} onClearProject={() => select("")} />
+      <CommandPane project={project} picker={<ProjectPicker store={store} selected={project} onSelect={select} />} />
     </div>
   );
 }

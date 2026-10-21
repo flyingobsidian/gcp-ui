@@ -99,15 +99,18 @@ build time.
 
 ## Project picker
 
-- The left sidebar lists every visible organization. Each org starts expanded,
-  showing its direct folders and projects.
-- Folders load lazily when expanded.
-- Projects with no visible organization appear under **No organization**.
+- The command bar starts with one box showing the chosen project.
+- Clicking the box, or pressing `/`, opens a popup below it with two tabs:
+  - **Search**: filters all projects by ID or display name. Space-separated
+    words must all match. Typing in the box switches to this tab. ↑/↓ moves
+    the selection and Enter picks.
+  - **Tree**: lists every visible organization, each starting expanded, with
+    its folders and projects. Folders load lazily when expanded. Projects with
+    no visible organization appear under **No organization**.
+- Picking a project closes the popup. So do Esc and clicking outside, which
+  keep the current project. **clear** unsets the project.
 - Every response is cached in memory and in `localStorage`. A reload paints
   from cache with no API calls.
 - Cached entries older than 10 minutes are shown immediately and refreshed in
   the background.
 - **⟳** clears the cache and reloads everything.
-- Type in the search box (or press `/`) to filter all projects by ID or
-  display name. Space-separated words must all match.
-- In search results, ↑/↓ moves the selection, Enter picks, and Esc clears.

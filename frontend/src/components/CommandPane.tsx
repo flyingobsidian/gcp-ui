@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useRef, useState } from "preact/hooks";
 import { errorText, runGcloud, type RunResponse } from "../api.ts";
 import { splitArgs } from "../args.ts";
@@ -9,7 +10,8 @@ interface Result {
 }
 
 // CommandPane runs an arbitrary gcloud command against the selected project.
-export function CommandPane({ project, onClearProject }: { project: string; onClearProject: () => void }) {
+// picker is rendered at the start of the command line.
+export function CommandPane({ project, picker }: { project: string; picker: ComponentChildren }) {
   const [command, setCommand] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState("");
@@ -47,10 +49,7 @@ export function CommandPane({ project, onClearProject }: { project: string; onCl
   return (
     <section class="pane">
       <form class="command" onSubmit={submit}>
-        <span class={`project-chip ${project ? "" : "none"}`} title={project ? "Project for this pane" : "No project selected"}>
-          {project || "no project"}
-          {project && <button type="button" class="chip-x" title="Clear project" onClick={onClearProject}>×</button>}
-        </span>
+        {picker}
         <span class="muted">gcloud</span>
         <input
           value={command}
