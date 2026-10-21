@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="gcpui-api-port" content="{{.APIPort}}">
+  <meta name="gcpui-cookie" content="{{.CookieName}}">
+  <title>gcp-ui</title>
+  <link rel="icon" href="data:,">
+{{- if .Built}}
+  <link rel="stylesheet" href="/static/app.css">
+  <script type="module" src="/static/app.js"></script>
+{{- end}}
+</head>
+<body>
+{{- if .Built}}
+  <div id="app"></div>
+{{- else}}
+  <p>The frontend has not been built. Run <code>make build</code> (or <code>make frontend</code>) and restart gcp-ui.</p>
+{{- end}}
+</body>
+</html>
