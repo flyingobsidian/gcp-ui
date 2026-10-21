@@ -161,3 +161,26 @@ build time.
 - Switching project re-runs the current command, but only if it is exactly a
   catalogue `list` command. Hand-typed commands never re-run on their own.
 - Use counts, stars and locations are stored in `localStorage`.
+
+## Console links
+
+In list results, some cells link to the matching Google Cloud console page,
+which opens in a new tab. The links are defined per service in
+`frontend/src/consoleLinks.ts`:
+
+| Service | Linked columns | Console page |
+|---|---|---|
+| MIGs | `name`, `baseInstanceName` | `compute/instanceGroups/details/<zone or region>/<name>?tab=overview` |
+| VMs | `name` | `compute/instancesDetail/zones/<zone>/instances/<name>` |
+| Buckets | `name` | `storage/browser/<bucket>` |
+| Schedules | `name` | `cloudscheduler/jobs/edit/<location>/<job>` |
+| Workflows | `name` | `workflows/workflow/<location>/<workflow>/executions` |
+| Cloud SQL | `name` | `sql/instances/<name>/overview` |
+| GKE clusters | `name` | `kubernetes/clusters/details/<location>/<name>/details` |
+| Pub/Sub topics, subscriptions | `name` | `cloudpubsub/{topic,subscription}/detail/<id>` |
+| Secrets | `name` | `security/secret-manager/secret/<id>/versions` |
+
+- Every URL carries `?project=<project>`.
+- Links are built from the command that produced the output, not from
+  whatever is currently typed.
+- Values from rows are URI-encoded one path segment at a time.
