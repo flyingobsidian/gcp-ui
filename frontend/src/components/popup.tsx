@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 // usePopup holds the shared state of a box-with-popup picker: whether the
 // popup is open, the text typed into the box, and refs for outside-click
 // detection and focus. A click outside root closes the popup.
-export function usePopup<T extends string>(defaultTab: T, boxRef?: RefObject<HTMLInputElement>) {
+export function usePopup<T extends string>(defaultTab: T, boxRef?: RefObject<HTMLInputElement | null>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<T>(defaultTab);

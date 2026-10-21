@@ -1,69 +1,47 @@
-import type { ComponentChildren } from "preact";
-import { useRef, useState } from "preact/hooks";
-import { errorText, runGcloud, type RunResponse } from "../api.ts";
-import { splitArgs } from "../args.ts";
+import type { ComponentChildren, RefObject } from "preact";
+import type { RunState } from "../useGcloudRun.ts";
 import { JsonView } from "./JsonView.tsx";
 
-interface Result {
-  response: RunResponse;
-  roundTripMs: number;
+interface Props {
+  // pickers are rendered at the start of the command line.
+  pickers: ComponentChildren;
+  command: string;
+  onCommand: (command: string) => void;
+  onRun: () => void;
+  run: RunState;
+  commandRef: RefObject<HTMLInputElement | null>;
 }
 
-// CommandPane runs an arbitrary gcloud command against the selected project.
-// picker is rendered at the start of the command line.
-export function CommandPane({ project, picker }: { project: string; picker: ComponentChildren }) {
-  const [command, setCommand] = useState("");
-  const [result, setResult] = useState<Result | null>(null);
-  const [error, setError] = useState("");
-  const [running, setRunning] = useState(false);
-  const abort = useRef<AbortController | null>(null);
-
-  const submit = async (e: Event) => {
+// CommandPane is the command line (pickers, gcloud command, Run) and the
+// output of the last run.
+export function CommandPane({ pickers, command, onCommand, onRun, run, commandRef }: Props) {
+  const submit = (e: Event) => {
     e.preventDefault();
-    let args: string[];
-    try {
-      args = splitArgs(command);
-    } catch (err) {
-      setError(errorText(err));
-      return;
-    }
-    if (args[0] === "gcloud") args = args.slice(1);
-    if (args.length === 0) return;
-    abort.current?.abort();
-    const ctl = new AbortController();
-    abort.current = ctl;
-    setRunning(true);
-    setError("");
-    const started = performance.now();
-    try {
-      const response = await runGcloud(args, project, ctl.signal);
-      setResult({ response, roundTripMs: Math.round(performance.now() - started) });
-    } catch (err) {
-      if (!ctl.signal.aborted) setError(errorText(err));
-    } finally {
-      if (abort.current === ctl) setRunning(false);
-    }
+    onRun();
   };
 
-  const out = result?.response;
+  const out = run.response;
   return (
     <section class="pane">
       <form class="command" onSubmit={submit}>
-        {picker}
+        {pickers}
         <span class="muted">gcloud</span>
         <input
+          ref={commandRef}
           value={command}
-          onInput={(e) => setCommand(e.currentTarget.value)}
+          onInput={(e) => onCommand(e.currentTarget.value)}
           placeholder="compute instances list"
+          aria-label="gcloud command"
           spellcheck={false}
           autocomplete="off"
         />
-        <button type="submit" disabled={running}>{running ? "…" : "Run"}</button>
+        <button type="submit" disabled={run.running}>{run.running ? "…" : "Run"}</button>
       </form>
-      <div class={`status ${error ? "error" : ""}`}>
-        {error || (running ? "running…" : out && [
+      <div class={`status ${run.error ? "error" : ""}`}>
+        {run.error || (run.running ? "running…" : out && [
           Array.isArray(out.output) ? `${out.output.length} items · ` : "",
-          `gcloud ${out.durationMs} ms · round trip ${result.roundTripMs} ms`,
+          run.project ? `${run.project} · ` : "",
+          `gcloud ${out.durationMs} ms · round trip ${run.roundTripMs} ms`,
         ].join(""))}
       </div>
       <div class="output">

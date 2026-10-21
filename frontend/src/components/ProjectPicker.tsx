@@ -1,4 +1,4 @@
-import type { ComponentChildren } from "preact";
+import type { ComponentChildren, RefObject } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import type { Container, Project } from "../hierarchy.ts";
 import { highlight, MAX_RESULTS, searchProjects } from "../search.ts";
@@ -12,6 +12,7 @@ interface Props {
   onSelect: (projectId: string) => void;
   // onPicked runs after a project is picked (not cleared), e.g. to move focus on.
   onPicked?: () => void;
+  boxRef?: RefObject<HTMLInputElement | null>;
 }
 
 type Tab = "search" | "tree";
@@ -19,9 +20,9 @@ type Tab = "search" | "tree";
 // ProjectPicker is a single box showing the chosen project. Focusing or
 // typing in it opens a popup with two tabs: filtered search results and the
 // organization/folder tree.
-export function ProjectPicker({ store, selected, onSelect, onPicked }: Props) {
+export function ProjectPicker({ store, selected, onSelect, onPicked, boxRef }: Props) {
   useStore(store);
-  const p = usePopup<Tab>("tree");
+  const p = usePopup<Tab>("tree", boxRef);
   const [active, setActive] = useState(0);
 
   const projects = store.allProjects.data ?? [];
