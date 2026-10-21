@@ -1,24 +1,26 @@
 # gcp-ui
 
-A fast, localhost-only web UI for Google Cloud. A Go backend runs
-`gcloud … --format=json` and the browser renders the JSON. See
+This repo contains a fast, localhost-only web UI for Google Cloud. A Go backend
+runs `gcloud … --format=json` and the browser renders the JSON. See
 [PLAN.md](PLAN.md) for the design and roadmap.
 
 ## Run
 
+Build the binary (`bin/gcp-ui`), then serve:
+- web UI: http://127.0.0.1:8080/
+- API: http://127.0.0.1:32000/
+
 ```sh
-make run            # builds bin/gcp-ui, then serves:
-                    #   web UI  http://127.0.0.1:8080/
-                    #   API     http://127.0.0.1:32000/
+make run
 ```
 
-| Flag | Env | Default |
-|---|---|---|
+| Flag         | Env              | Default |
+|--------------|------------------|---------|
 | `--web-port` | `GCPUI_WEB_PORT` | `8080` |
 | `--api-port` | `GCPUI_API_PORT` | `32000` |
-| `--bind` | `GCPUI_BIND` | `127.0.0.1` (loopback only; anything else is refused) |
-| `--gcloud` | `GCPUI_GCLOUD` | `gcloud` on `$PATH` |
-| `--timeout` | `GCPUI_TIMEOUT` | `2m` per command |
+| `--bind`     | `GCPUI_BIND`     | `127.0.0.1` (loopback only; anything else is refused) |
+| `--gcloud`   | `GCPUI_GCLOUD`   | `gcloud` on `$PATH` |
+| `--timeout`  | `GCPUI_TIMEOUT`  | `2m` per command |
 | `--max-concurrent` | `GCPUI_MAX_CONCURRENT` | `8` gcloud processes |
 
 Flags override environment variables.
