@@ -162,6 +162,20 @@ build time.
   catalogue `list` command. Hand-typed commands never re-run on their own.
 - Use counts, stars and locations are stored in `localStorage`.
 
+## Cached results
+
+- Picking a service or switching project shows the previous result for that
+  project and command if it is less than an hour old, without running gcloud.
+- The status line then says `cached 12 min ago · Run to refresh`.
+- **Run** always runs gcloud and updates the cache.
+- Only the read-only catalogue `list` commands are cached. Results are stored
+  per project and exact command (including `--location`).
+- Hand-typed commands and failed commands are never cached.
+- Results are kept in memory and in `localStorage`, so a reload still uses
+  them. The 100 most recent are kept.
+- The maximum age is `RESULT_MAX_AGE_MS` in `frontend/src/resultCache.ts`
+  (3600 s).
+
 ## Console links
 
 In list results, some cells link to the matching Google Cloud console page,
