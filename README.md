@@ -143,6 +143,28 @@ build time.
   the background.
 - **⟳** clears the cache and reloads everything.
 
+## Panes
+
+The window starts as one pane filling the screen. Each pane has its own
+project picker, service picker, command line, Run button and results table.
+
+| Button | Effect |
+|---|---|
+| ▥ | Split into two columns; the copy appears to the right |
+| ▤ | Split into two rows; the copy appears below |
+| ✕ | Close the pane; its neighbour takes the space (not shown on the last pane) |
+
+- **Splitting:** the new pane starts with the same project and object type as
+  the original. Its table comes from the result cache when fresh, so no gcloud
+  call is needed.
+- **Independence:** the original pane keeps everything (results, filter,
+  hand-typed command).
+- **Splits nest:** any pane can be split again.
+- **Active pane:** the one last clicked or focused, marked by a blue line along
+  its top. It owns the `/` shortcut.
+- **Saved in the URL:** the layout is saved, so Back undoes a split, close or
+  pick, and a reload or shared link restores every pane.
+
 ## Page state in the URL
 
 The URL query records what is shown, so a page can be reloaded, bookmarked
@@ -178,9 +200,6 @@ pane   := [project] ["/" [service] ["@" location]]
 - **Not encoded:** hand-typed (non-catalogue) commands. The pane then records
   only the project.
 
-The UI currently shows a single pane: the first pane of the active layout.
-Other panes in a shared URL are preserved untouched until multi-pane display
-is built.
 
 ## Service picker
 
