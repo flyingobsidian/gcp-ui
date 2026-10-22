@@ -1,6 +1,7 @@
 import type { ComponentChildren, RefObject } from "preact";
 import { useMemo } from "preact/hooks";
 import { linkerFor } from "../consoleLinks.ts";
+import { ageText } from "../resultCache.ts";
 import { matchCommand } from "../services.ts";
 import type { TablePrefs } from "../tablePrefs.ts";
 import type { RunState } from "../useGcloudRun.ts";
@@ -58,7 +59,9 @@ export function CommandPane({ pickers, command, onCommand, onRun, run, commandRe
         {run.error || (run.running ? "running…" : out && [
           Array.isArray(out.output) ? `${out.output.length} items · ` : "",
           run.project ? `${run.project} · ` : "",
-          `gcloud ${out.durationMs} ms · round trip ${run.roundTripMs} ms`,
+          run.cachedAt !== undefined
+            ? `cached ${ageText(Date.now() - run.cachedAt)} · Run to refresh`
+            : `gcloud ${out.durationMs} ms · round trip ${run.roundTripMs} ms`,
         ].join(""))}
       </div>
       <div class="output">

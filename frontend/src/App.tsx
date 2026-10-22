@@ -4,6 +4,7 @@ import { splitArgs } from "./args.ts";
 import { CommandPane } from "./components/CommandPane.tsx";
 import { ProjectPicker } from "./components/ProjectPicker.tsx";
 import { ServicePicker } from "./components/ServicePicker.tsx";
+import { ResultCache } from "./resultCache.ts";
 import { ServicePrefs } from "./servicePrefs.ts";
 import { TablePrefs } from "./tablePrefs.ts";
 import { buildCommand, catalogueCommand, type Service } from "./services.ts";
@@ -30,14 +31,18 @@ export function App() {
   const tablePrefs = useMemo(() => new TablePrefs(storage()), []);
   const [project, setProject] = useState(() => storage()?.getItem(SELECTED_KEY) ?? "");
   const [command, setCommand] = useState("");
-  const { state: run, run: runArgs, fail } = useGcloudRun();
+  const results = useMemo(() => new ResultCache(storage()), []);
+  const { state: run, run: runArgs, fail } = useGcloudRun(results);
   const projectBox = useRef<HTMLInputElement>(null);
   const serviceBox = useRef<HTMLInputElement>(null);
   const commandBox = useRef<HTMLInputElement>(null);
 
   const current = useMemo(() => catalogueCommand(command), [command]);
 
-  const execute = (text: string, onProject: string) => {
+  // execute runs text for onProject. Switching tables passes useCache, so a
+  // recent result is shown instead of re-running gcloud; the Run button does
+  // not. Only read-only catalogue list commands are cached.
+  const execute = (text: string, onProject: string, useCache: boolean) => {
     let args: string[];
     try {
       args = splitArgs(text);
@@ -49,7 +54,7 @@ export function App() {
     if (args.length === 0) return;
     const cat = catalogueCommand(text);
     if (cat?.runnable && cat.location) prefs.setLocation(cat.service.id, cat.location);
-    void runArgs(args, onProject);
+    void runArgs(args, onProject, { useCache, cacheable: !!cat?.runnable });
   };
 
   // focusCommandEnd puts the cursor at the end of the command line, e.g. to
@@ -73,7 +78,7 @@ export function App() {
     }
     // Switching project re-runs the current command, but only when it is a
     // read-only catalogue list command.
-    if (id && current?.runnable) execute(command, id);
+    if (id && current?.runnable) execute(command, id, true);
   };
 
   const afterProjectPicked = () => {
@@ -89,7 +94,7 @@ export function App() {
     } else if (!project) {
       requestAnimationFrame(() => projectBox.current?.focus());
     } else {
-      execute(built.text, project);
+      execute(built.text, project, true);
     }
   };
 
@@ -102,7 +107,7 @@ export function App() {
         </>}
         command={command}
         onCommand={setCommand}
-        onRun={() => execute(command, project)}
+        onRun={() => execute(command, project, false)}
         run={run}
         commandRef={commandBox}
         tablePrefs={tablePrefs}
