@@ -193,7 +193,11 @@ which opens in a new tab. The links are defined per service in
 - **Resize:** drag the right edge of a header. Long values are cut off with
   `…`; hover to see them in full.
 - **Reorder:** drag a header onto another column.
-- **reset columns** (above the table) restores the default order and widths.
+- **Show/hide columns:** the ☰ menu at the start of the header row ticks
+  columns on and off. It also has **show all** and **defaults**. At least one
+  column stays visible.
+- **reset columns** (above the table) restores the default columns, order and
+  widths.
 - **Filter:** type in the box above the table to show only matching rows.
   - Every visible column is searched, case-insensitively.
   - Space-separated words must all match, but each can match a different
@@ -204,12 +208,28 @@ which opens in a new tab. The links are defined per service in
   - The filter is kept when you switch project and cleared when you switch
     service. It is not saved across reloads.
 
+### Defaults
+
+Some services have sensible defaults (`frontend/src/tableDefaults.ts`). Values
+are shortened for display: sorting and filtering use the short value, while
+console links still use the full value from gcloud.
+
+| Service | Default columns | Shortened | Extras |
+|---|---|---|---|
+| VMs | name, zone, status | `zone`, `machineType` → last segment (`europe-west1-b`) | ⌨ next to the name copies `gcloud compute ssh --zone ZONE --tunnel-through-iap --project PROJECT NAME` |
+| MIGs | name, region, size, targetSize | `region` is computed: the MIG's region, or the region of its zone; `zone`, `instanceTemplate` → last segment | |
+| Schedules | name, schedule, state, description | `name` → job ID (after the last `/`) | |
+
+The ⌨ button only appears when the name, zone and project contain nothing but
+`a-z 0-9 . : -`. A value from gcloud therefore can never put shell syntax on
+your clipboard.
+
 Arrangements are saved in `localStorage`:
 
 | Setting | Remembered per |
 |---|---|
 | Sort | project and table, e.g. VMs in `prod-a` can sort by zone while MIGs sort by name |
-| Column order and widths | table, shared by every project |
+| Visible columns, order and widths | table, shared by every project |
 
 A table is identified by its catalogue service (VMs, MIGs, …). For hand-typed
 commands it is identified by the command words without flags, so
