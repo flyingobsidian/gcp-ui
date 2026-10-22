@@ -1,5 +1,5 @@
 import type { ComponentChildren, RefObject } from "preact";
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { copyToClipboard } from "../clipboard.ts";
 import type { Container, Project } from "../hierarchy.ts";
 import { highlight, MAX_RESULTS, searchProjects } from "../search.ts";
@@ -16,6 +16,8 @@ interface Props {
   boxRef?: RefObject<HTMLInputElement | null>;
   // recent lists recently picked project IDs, newest first.
   recent: readonly string[];
+  // shortcut enables the "/" key for this picker (default true).
+  shortcut?: boolean;
 }
 
 type Tab = "recent" | "search" | "tree";
@@ -24,7 +26,7 @@ type Tab = "recent" | "search" | "tree";
 // copy its ID. Focusing or typing in the box opens a popup with three tabs:
 // recently picked projects, filtered search results and the
 // organization/folder tree.
-export function ProjectPicker({ store, selected, onSelect, onPicked, boxRef, recent }: Props) {
+export function ProjectPicker({ store, selected, onSelect, onPicked, boxRef, recent, shortcut = true }: Props) {
   useStore(store);
   const p = usePopup<Tab>(recent.length > 0 ? "recent" : "tree", boxRef);
   const [active, setActive] = useState(0);
@@ -47,11 +49,14 @@ export function ProjectPicker({ store, selected, onSelect, onPicked, boxRef, rec
     return () => clearTimeout(t);
   }, [copied]);
 
-  // "/" focuses the box from anywhere outside a text field.
+  // "/" focuses the box from anywhere outside a text field. With several
+  // panes, only the active pane's picker answers.
+  const shortcutOn = useRef(shortcut);
+  shortcutOn.current = shortcut;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (e.key === "/" && !(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) {
+      if (e.key === "/" && shortcutOn.current && !(t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement)) {
         e.preventDefault();
         p.box.current?.focus();
       }

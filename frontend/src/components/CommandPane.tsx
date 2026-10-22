@@ -16,6 +16,8 @@ interface Props {
   run: RunState;
   commandRef: RefObject<HTMLInputElement | null>;
   tablePrefs: TablePrefs;
+  // controls are rendered at the end of the command line (pane buttons).
+  controls?: ComponentChildren;
 }
 
 // tableIdFor names the table produced by a non-catalogue command by its
@@ -27,7 +29,7 @@ function tableIdFor(args: readonly string[]): string {
 
 // CommandPane is the command line (pickers, gcloud command, Run) and the
 // output of the last run.
-export function CommandPane({ pickers, command, onCommand, onRun, run, commandRef, tablePrefs }: Props) {
+export function CommandPane({ pickers, command, onCommand, onRun, run, commandRef, tablePrefs, controls }: Props) {
   const submit = (e: Event) => {
     e.preventDefault();
     onRun();
@@ -54,6 +56,7 @@ export function CommandPane({ pickers, command, onCommand, onRun, run, commandRe
           autocomplete="off"
         />
         <button type="submit" disabled={run.running}>{run.running ? "…" : "Run"}</button>
+        {controls}
       </form>
       <div class={`status ${run.error ? "error" : ""}`}>
         {run.error || (run.running ? "running…" : out && [
