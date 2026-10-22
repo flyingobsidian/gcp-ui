@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { copyToClipboard } from "../clipboard.ts";
 import type { CellLinker } from "../consoleLinks.ts";
 import { highlight } from "../search.ts";
 import { displayColumns, displayRow, type RowAction, type TableDefaults } from "../tableDefaults.ts";
@@ -252,23 +253,4 @@ export function DataTable({ rows, columns, prefs, table, project, defaults, link
 
 function Highlighted({ text, query }: { text: string; query: string }) {
   return <>{highlight(text, query).map((seg, i) => (seg.hit ? <mark key={i}>{seg.text}</mark> : seg.text))}</>;
-}
-
-// copyToClipboard uses the async clipboard API (available because the UI is
-// served from localhost, a secure context), falling back to execCommand.
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand("copy");
-    ta.remove();
-    return ok;
-  }
 }
