@@ -143,6 +143,45 @@ build time.
   the background.
 - **⟳** clears the cache and reloads everything.
 
+## Page state in the URL
+
+The URL query records what is shown, so a page can be reloaded, bookmarked
+or shared:
+
+```
+http://localhost:8080/?layout=row(prod-a/vms,col:60:40(prod-b/migs,prod-b/scheduler@europe-west2))&layout=dev-x/buckets&active=1
+```
+
+```
+layout := split | pane
+split  := ("row" | "col") (":" size)* "(" layout ("," layout)+ ")"
+pane   := [project] ["/" [service] ["@" location]]
+```
+
+- **Panes:** each pane is a project and an object type (a service ID from the
+  catalogue, e.g. `vms`, `migs`, `buckets`, `scheduler`). Location-scoped
+  services add `@location`.
+- **Splits:** `row(…)` places panes side by side and `col(…)` stacks them.
+  Splits nest. Optional `:size` values are relative weights, one per child.
+- **Several layouts:** `layout=` may repeat, one per window or tab. `active=N`
+  (0-based) says which one is showing.
+- **Validation:**
+  - Malformed structure is ignored, and the page falls back to the last
+    project.
+  - An unknown service, invalid project ID or bad location is dropped from its
+    pane only.
+  - Limits: 8 levels deep, 32 panes, 16 layouts.
+- **History:** picking a project or service adds a browser history entry, so
+  Back/Forward hop between views, served from the result cache when fresh.
+- **No secrets:** the access token stays in the `#fragment` and is never part
+  of the shared query.
+- **Not encoded:** hand-typed (non-catalogue) commands. The pane then records
+  only the project.
+
+The UI currently shows a single pane: the first pane of the active layout.
+Other panes in a shared URL are preserved untouched until multi-pane display
+is built.
+
 ## Service picker
 
 - The service box sits right of the project box. Tab moves project → service →
