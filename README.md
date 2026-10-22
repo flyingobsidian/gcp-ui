@@ -194,6 +194,15 @@ which opens in a new tab. The links are defined per service in
   `…`; hover to see them in full.
 - **Reorder:** drag a header onto another column.
 - **reset columns** (above the table) restores the default order and widths.
+- **Filter:** type in the box above the table to show only matching rows.
+  - Every visible column is searched, case-insensitively.
+  - Space-separated words must all match, but each can match a different
+    column, so `web europe` finds `web-1` in `europe-west2-a`.
+  - Matches are highlighted, including inside console links.
+  - Esc clears the filter.
+  - Sorting applies to the filtered rows.
+  - The filter is kept when you switch project and cleared when you switch
+    service. It is not saved across reloads.
 
 Arrangements are saved in `localStorage`:
 
