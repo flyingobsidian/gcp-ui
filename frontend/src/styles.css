@@ -92,7 +92,11 @@ table.data .cell { overflow: hidden; text-overflow: ellipsis; white-space: nowra
 .sort-mark { color: var(--accent); font-size: 0.8em; }
 .resize { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; }
 .resize:hover, .resize:active { background: linear-gradient(to right, transparent 3px, var(--accent) 3px, var(--accent) 5px, transparent 5px); }
-.reset-layout { border: none; background: none; color: var(--muted); padding: 0 0 4px; font-size: 0.85em; }
+.table-tools { display: flex; align-items: center; gap: 10px; padding: 0 0 6px; position: sticky; left: 0; }
+.table-filter { width: 28ch; }
+.filter-count { font-size: 0.85em; }
+.no-match { padding: 6px 0; }
+.reset-layout { border: none; background: none; color: var(--muted); padding: 0; font-size: 0.85em; }
 .reset-layout:hover { color: var(--fg); }
 td a { color: var(--accent); text-decoration: none; }
 td a:hover { text-decoration: underline; }

@@ -21,7 +21,9 @@ export function JsonView({ value, prefs, table, project, linkFor }: Props) {
     for (const row of value) {
       for (const [k, v] of Object.entries(row)) if (isScalar(v) && !cols.includes(k)) cols.push(k);
     }
-    return <DataTable rows={value} columns={cols} prefs={prefs} table={table} project={project} linkFor={linkFor} />;
+    // Keyed by table: the filter survives a project switch but resets when
+    // a different kind of table is shown.
+    return <DataTable key={table} rows={value} columns={cols} prefs={prefs} table={table} project={project} linkFor={linkFor} />;
   }
   return <pre>{typeof value === "string" ? value : JSON.stringify(value, null, 2)}</pre>;
 }

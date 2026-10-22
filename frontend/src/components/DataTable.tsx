@@ -1,5 +1,7 @@
 import { useRef, useState } from "preact/hooks";
 import type { CellLinker } from "../consoleLinks.ts";
+import { highlight } from "../search.ts";
+import { cellText, filterRows } from "../tableFilter.ts";
 import { clampWidth, moveColumn, nextSort, orderColumns, sortRows, type TablePrefs } from "../tablePrefs.ts";
 
 type Row = Record<string, unknown>;
@@ -22,7 +24,9 @@ interface Drag {
 }
 
 // DataTable is a results table whose columns can be sorted (click a header),
-// resized (drag a header's right edge) and reordered (drag a header).
+// resized (drag a header's right edge) and reordered (drag a header). The
+// filter box above it hides rows not matching the typed text, which is
+// highlighted in the rows that remain.
 export function DataTable({ rows, columns, prefs, table, project, linkFor }: Props) {
   // prefs is not reactive; bump re-renders after changes.
   const [, setVersion] = useState(0);
@@ -30,11 +34,13 @@ export function DataTable({ rows, columns, prefs, table, project, linkFor }: Pro
   const [liveWidth, setLiveWidth] = useState<{ column: string; width: number } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const resizing = useRef(false);
+  const [filter, setFilter] = useState("");
 
   const layout = prefs.layout(table);
   const cols = orderColumns(columns, layout.order);
   const sort = prefs.sort(project, table);
-  const sorted = sortRows(rows, sort && cols.includes(sort.column) ? sort : undefined);
+  const shown = filterRows(rows, cols, filter);
+  const sorted = sortRows(shown, sort && cols.includes(sort.column) ? sort : undefined);
   const widthOf = (c: string) => (liveWidth?.column === c ? liveWidth.width : layout.widths[c]);
 
   const onHeaderClick = (c: string) => {
@@ -86,12 +92,28 @@ export function DataTable({ rows, columns, prefs, table, project, linkFor }: Pro
 
   return (
     <>
-      {customised && (
-        <button type="button" class="link reset-layout" title="Restore default column order and widths"
-          onClick={() => { prefs.resetLayout(table); bump(); }}>
-          reset columns
-        </button>
-      )}
+      <div class="table-tools">
+        <input
+          type="search"
+          class="table-filter"
+          placeholder="filter rows"
+          aria-label="Filter rows"
+          value={filter}
+          onInput={(e) => setFilter(e.currentTarget.value)}
+          onKeyDown={(e) => { if (e.key === "Escape") setFilter(""); }}
+          spellcheck={false}
+          autocomplete="off"
+        />
+        <span class="muted filter-count">
+          {filter.trim() ? `${shown.length} of ${rows.length} rows` : `${rows.length} rows`}
+        </span>
+        {customised && (
+          <button type="button" class="link reset-layout" title="Restore default column order and widths"
+            onClick={() => { prefs.resetLayout(table); bump(); }}>
+            reset columns
+          </button>
+        )}
+      </div>
       <table class="data">
         <thead>
           <tr>
@@ -139,23 +161,31 @@ export function DataTable({ rows, columns, prefs, table, project, linkFor }: Pro
           {sorted.map((row, i) => (
             <tr key={i}>
               {cols.map((c) => {
-                const text = String(row[c] ?? "");
+                const text = cellText(row[c]);
+                const content = filter.trim() ? <Highlighted text={text} query={filter} /> : text;
                 const href = text ? linkFor?.(row, c) : undefined;
                 const w = widthOf(c);
                 return (
                   <td key={c}>
                     <div class="cell" style={w ? { width: `${w}px` } : undefined} title={w ? text : undefined}>
                       {href
-                        ? <a href={href} target="_blank" rel="noopener noreferrer" title="Open in Google Cloud console">{text}</a>
-                        : text}
+                        ? <a href={href} target="_blank" rel="noopener noreferrer" title="Open in Google Cloud console">{content}</a>
+                        : content}
                     </div>
                   </td>
                 );
               })}
             </tr>
           ))}
+          {sorted.length === 0 && (
+            <tr><td class="muted no-match" colSpan={cols.length}>no rows match “{filter.trim()}”</td></tr>
+          )}
         </tbody>
       </table>
     </>
   );
+}
+
+function Highlighted({ text, query }: { text: string; query: string }) {
+  return <>{highlight(text, query).map((seg, i) => (seg.hit ? <mark key={i}>{seg.text}</mark> : seg.text))}</>;
 }
