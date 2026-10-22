@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clampWidth, MAX_WIDTH, MIN_WIDTH, moveColumn, nextSort, orderColumns, sortRows, TablePrefs } from "./tablePrefs.ts";
+import {
+  clampWidth, MAX_WIDTH, MIN_WIDTH, moveColumn, nextSort, orderColumns, sortRows, TablePrefs, toggleColumn, visibleColumns,
+} from "./tablePrefs.ts";
 import type { StorageLike } from "./cache.ts";
 
 class MemStorage implements StorageLike {
@@ -86,4 +88,27 @@ test("corrupt or hostile saved prefs are ignored", () => {
   const p = new TablePrefs(storage);
   assert.equal(p.sort("", "a"), undefined);
   assert.deepEqual(p.layout("t"), { order: ["a"], widths: { b: MAX_WIDTH } });
+});
+
+test("visibleColumns: user choice, then defaults, then everything", () => {
+  const ordered = ["name", "zone", "status", "id"];
+  assert.deepEqual(visibleColumns(ordered, undefined, undefined), ordered);
+  assert.deepEqual(visibleColumns(ordered, undefined, ["status", "name"]), ["name", "status"]);
+  assert.deepEqual(visibleColumns(ordered, ["id"], ["status", "name"]), ["id"]);
+  assert.deepEqual(visibleColumns(ordered, ["gone"], undefined), ordered, "never show an empty table");
+});
+
+test("toggleColumn keeps at least one column", () => {
+  assert.deepEqual(toggleColumn(["a", "b"], "b"), ["a"]);
+  assert.deepEqual(toggleColumn(["a"], "c"), ["a", "c"]);
+  assert.deepEqual(toggleColumn(["a"], "a"), ["a"]);
+});
+
+test("visible columns persist and reset with the layout", () => {
+  const storage = new MemStorage();
+  new TablePrefs(storage).setVisible("vms", ["name", "id"]);
+  const p = new TablePrefs(storage);
+  assert.deepEqual(p.layout("vms").visible, ["name", "id"]);
+  p.resetLayout("vms");
+  assert.equal(new TablePrefs(storage).layout("vms").visible, undefined);
 });

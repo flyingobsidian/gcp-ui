@@ -16,6 +16,9 @@ export interface Sort {
 export interface Layout {
   order: string[];
   widths: Record<string, number>;
+  // visible lists the columns the user chose to show; undefined means the
+  // table's defaults.
+  visible?: string[];
 }
 
 interface Saved {
@@ -64,6 +67,11 @@ export class TablePrefs {
     this.save();
   }
 
+  setVisible(table: string, visible: string[]): void {
+    this.data.layouts[table] = { ...this.layout(table), visible };
+    this.save();
+  }
+
   // resetLayout forgets column order and widths for table (not its sorts).
   resetLayout(table: string): void {
     delete this.data.layouts[table];
@@ -88,7 +96,8 @@ export class TablePrefs {
         for (const [c, w] of Object.entries(isObject(l.widths) ? l.widths : {})) {
           if (typeof w === "number" && Number.isFinite(w)) widths[c] = clampWidth(w);
         }
-        layouts[k] = { order, widths };
+        const visible = Array.isArray(l.visible) ? l.visible.filter((c): c is string => typeof c === "string") : undefined;
+        layouts[k] = visible ? { order, widths, visible } : { order, widths };
       }
       return { sorts, layouts };
     } catch {
@@ -109,6 +118,23 @@ const isObject = (v: unknown): v is Record<string, any> => typeof v === "object"
 
 export function clampWidth(w: number): number {
   return Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w)));
+}
+
+// visibleColumns picks the columns to show from ordered: the user's choice
+// if any, else the table defaults, else everything. If neither choice
+// matches any column in this data, everything is shown rather than nothing.
+export function visibleColumns(ordered: readonly string[], chosen: readonly string[] | undefined, defaults: readonly string[] | undefined): string[] {
+  const pick = chosen ?? defaults;
+  if (!pick) return [...ordered];
+  const shown = ordered.filter((c) => pick.includes(c));
+  return shown.length > 0 ? shown : [...ordered];
+}
+
+// toggleColumn adds or removes column from the visible set, keeping at least
+// one column visible.
+export function toggleColumn(visible: readonly string[], column: string): string[] {
+  if (!visible.includes(column)) return [...visible, column];
+  return visible.length > 1 ? visible.filter((c) => c !== column) : [...visible];
 }
 
 // orderColumns applies a saved order to the columns found in the data:
