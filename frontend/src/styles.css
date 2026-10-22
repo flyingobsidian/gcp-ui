@@ -24,6 +24,17 @@ ul { list-style: none; margin: 0; padding: 0; }
 .pad { padding: 6px 8px; margin: 0; }
 
 .layout { display: flex; flex-direction: column; height: 100%; }
+.layout.panes { position: relative; display: block; }
+/* Pane slots must not clip (pickers' popups extend past them) or create a
+   stacking context (popups must sit above neighbouring panes). */
+.pane-slot { position: absolute; display: flex; box-sizing: border-box; }
+.pane-slot.left-edge { border-left: 1px solid var(--border); }
+.pane-slot.top-edge { border-top: 1px solid var(--border); }
+.pane-frame { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.pane-frame.active { box-shadow: inset 0 2px 0 rgb(76 154 255 / 0.6); }
+.pane-controls { display: inline-flex; gap: 2px; margin-left: 4px; }
+.pane-controls button { border: none; background: none; padding: 0 4px; color: var(--muted); font-size: 1.1em; }
+.pane-controls button:hover { color: var(--fg); }
 
 .gate { max-width: 60ch; margin: 15vh auto; padding: 0 16px; }
 .gate h1 { font-size: 1.2em; }
@@ -79,8 +90,8 @@ mark { background: var(--mark); color: inherit; }
 
 /* command pane */
 .pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; flex: 1; }
-.command { display: flex; gap: 6px; align-items: center; padding: 8px; border-bottom: 1px solid var(--border); }
-.command > input { flex: 1; min-width: 0; }
+.command { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px; border-bottom: 1px solid var(--border); }
+.command > input { flex: 1; min-width: 16ch; }
 .status { padding: 4px 8px; color: var(--muted); min-height: 1.4em; white-space: pre-wrap; }
 .status.error { color: var(--error); }
 .output { padding: 0 8px 8px; overflow: auto; flex: 1; }
