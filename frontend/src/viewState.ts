@@ -226,3 +226,29 @@ export function closePane(layout: Layout, id: string): Layout {
   const sizes = layout.sizes?.filter((_, j) => j !== i);
   return sizes ? { ...layout, children, sizes } : { kind: "split", dir: layout.dir, children };
 }
+
+export interface PaneRect {
+  pane: Pane;
+  // x, y, w, h are fractions (0-1) of the whole layout area.
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+// layoutRects places every pane: a row split divides its width among its
+// children by their size weights, a col split divides its height.
+export function layoutRects(layout: Layout, x = 0, y = 0, w = 1, h = 1): PaneRect[] {
+  if (layout.kind === "pane") return [{ pane: layout, x, y, w, h }];
+  const weights = layout.sizes ?? layout.children.map(() => 1);
+  const total = weights.reduce((a, b) => a + b, 0);
+  const out: PaneRect[] = [];
+  let offset = 0;
+  layout.children.forEach((child, i) => {
+    const share = weights[i]! / total;
+    if (layout.dir === "row") out.push(...layoutRects(child, x + offset * w, y, share * w, h));
+    else out.push(...layoutRects(child, x, y + offset * h, w, share * h));
+    offset += share;
+  });
+  return out;
+}

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   closePane, findPane, firstPanePath, formatLayout, MAX_DEPTH, MAX_PANES, pane, paneAt, panesOf, ParseError, parseLayout,
-  readView, splitPane, updatePane, withIds, withPane, writeView, type Layout,
+  layoutRects, readView, splitPane, updatePane, withIds, withPane, writeView, type Layout,
 } from "./viewState.ts";
 
 const nested = "row(prod-alpha/vms,col:60:40(prod-beta/migs,prod-beta/scheduler@europe-west2))";
@@ -124,4 +124,11 @@ test("closePane keeps the remaining sizes", () => {
   const l = withIds(parseLayout("row:1:2:3(proj-one1,proj-two2,proj-three)"));
   const second = panesOf(l)[1]!.id!;
   assert.equal(formatLayout(closePane(l, second)), "row:1:3(proj-one1,proj-three)");
+});
+
+test("layoutRects", () => {
+  const r = layoutRects(parseLayout("row:1:3(proj-one1,col(proj-two2,proj-three))"));
+  const fmt = r.map((x) => [x.pane.project, x.x, x.y, x.w, x.h].join(" "));
+  assert.deepEqual(fmt, ["proj-one1 0 0 0.25 1", "proj-two2 0.25 0 0.75 0.5", "proj-three 0.25 0.5 0.75 0.5"]);
+  assert.deepEqual(layoutRects(pane("p")).map((x) => [x.x, x.y, x.w, x.h]), [[0, 0, 1, 1]]);
 });
