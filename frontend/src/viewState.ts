@@ -139,10 +139,13 @@ export function writeView(view: ViewState, base = ""): string {
   const params = new URLSearchParams(base);
   params.delete("layout");
   params.delete("active");
-  const parts = view.layouts.map((l) => `layout=${formatLayout(l)}`);
-  if (view.active > 0) parts.push(`active=${view.active}`);
+  // A single empty pane is the default view, so it needs no parameter.
+  const empty = view.layouts.length === 1 && formatLayout(view.layouts[0]!) === "";
+  const parts = empty ? [] : view.layouts.map((l) => `layout=${formatLayout(l)}`);
+  if (!empty && view.active > 0) parts.push(`active=${view.active}`);
   const other = params.toString();
-  return `?${[...parts, ...(other ? [other] : [])].join("&")}`;
+  if (other) parts.push(other);
+  return parts.length ? `?${parts.join("&")}` : "";
 }
 
 // A PanePath addresses a pane by child indexes from the layout root.

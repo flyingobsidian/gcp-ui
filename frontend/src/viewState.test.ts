@@ -64,6 +64,8 @@ test("readView and writeView", () => {
   assert.equal(view.active, 1);
   assert.equal(writeView(view), search);
   assert.equal(writeView({ layouts: [pane("dev-proj1", "vms")], active: 0 }, "?debug=1&layout=old"), "?layout=dev-proj1/vms&debug=1");
+  assert.equal(writeView({ layouts: [pane("")], active: 0 }), "", "empty view has no query");
+  assert.equal(writeView({ layouts: [pane("")], active: 0 }, "?debug=1"), "?debug=1");
   assert.equal(readView(""), undefined);
   assert.equal(readView("?layout=row(a"), undefined);
   assert.equal(readView("?layout=dev-proj1/vms&active=7")?.active, 0);
