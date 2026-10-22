@@ -124,7 +124,11 @@ build time.
 ## Project picker
 
 - The command bar starts with one box showing the chosen project.
-- Clicking the box, or pressing `/`, opens a popup below it with two tabs:
+- **⧉** next to the box copies the chosen project ID to the clipboard.
+- Clicking the box, or pressing `/`, opens a popup below it with three tabs:
+  - **Recent**: the last 15 projects you picked, newest first. The popup opens
+    on this tab once you have picked any project. ↑/↓ and Enter pick, so
+    jumping back to the previous project is `/ ↓ Enter`.
   - **Search**: filters all projects by ID or display name. Space-separated
     words must all match. Typing in the box switches to this tab. ↑/↓ moves
     the selection and Enter picks.
