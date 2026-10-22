@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  firstPanePath, formatLayout, MAX_DEPTH, MAX_PANES, pane, paneAt, ParseError, parseLayout, readView, withPane, writeView,
-  type Layout,
+  closePane, findPane, firstPanePath, formatLayout, MAX_DEPTH, MAX_PANES, pane, paneAt, panesOf, ParseError, parseLayout,
+  readView, splitPane, updatePane, withIds, withPane, writeView, type Layout,
 } from "./viewState.ts";
 
 const nested = "row(prod-alpha/vms,col:60:40(prod-beta/migs,prod-beta/scheduler@europe-west2))";
@@ -84,4 +84,44 @@ test("pane paths", () => {
   assert.equal(formatLayout(changed), "row(prod-alpha/vms,col:60:40(prod-gamma/buckets,prod-beta/scheduler@europe-west2))");
   assert.equal(formatLayout(l), nested, "original untouched");
   assert.deepEqual(withPane(pane("a"), [], pane("prod-alpha", "vms")), pane("prod-alpha", "vms"));
+});
+
+test("withIds gives every pane a distinct id, and ids stay out of the URL", () => {
+  const l = withIds(parseLayout(nested));
+  const ids = panesOf(l).map((p) => p.id);
+  assert.equal(new Set(ids).size, 3);
+  assert.ok(ids.every(Boolean));
+  assert.equal(formatLayout(l), nested);
+  assert.deepEqual(panesOf(withIds(l)).map((p) => p.id), ids);
+});
+
+test("splitPane copies the pane beside or below it", () => {
+  const one = { ...pane("prod-alpha", "scheduler", "europe-west2"), id: "a" };
+  const cols = splitPane(one, "a", "row", "b");
+  assert.equal(formatLayout(cols), "row(prod-alpha/scheduler@europe-west2,prod-alpha/scheduler@europe-west2)");
+  assert.deepEqual(panesOf(cols).map((p) => p.id), ["a", "b"]);
+  const nestedSplit = splitPane(cols, "b", "col", "c");
+  assert.equal(formatLayout(nestedSplit),
+    "row(prod-alpha/scheduler@europe-west2,col(prod-alpha/scheduler@europe-west2,prod-alpha/scheduler@europe-west2))");
+  assert.equal(formatLayout(splitPane(cols, "zzz", "row", "d")), formatLayout(cols), "unknown id: unchanged");
+});
+
+test("closePane removes a pane and collapses single-child splits", () => {
+  let l: Layout = { ...pane("prod-alpha", "vms"), id: "a" };
+  l = splitPane(l, "a", "row", "b");
+  l = splitPane(l, "b", "col", "c");
+  l = updatePane(l, "c", (p) => ({ ...p, service: "migs" }));
+  assert.equal(formatLayout(l), "row(prod-alpha/vms,col(prod-alpha/vms,prod-alpha/migs))");
+  const noB = closePane(l, "b");
+  assert.equal(formatLayout(noB), "row(prod-alpha/vms,prod-alpha/migs)");
+  const onlyC = closePane(noB, "a");
+  assert.equal(onlyC.kind, "pane");
+  assert.equal(findPane(onlyC, "c")?.service, "migs");
+  assert.equal(closePane(onlyC, "c"), onlyC, "the last pane stays");
+});
+
+test("closePane keeps the remaining sizes", () => {
+  const l = withIds(parseLayout("row:1:2:3(proj-one1,proj-two2,proj-three)"));
+  const second = panesOf(l)[1]!.id!;
+  assert.equal(formatLayout(closePane(l, second)), "row:1:3(proj-one1,proj-three)");
 });

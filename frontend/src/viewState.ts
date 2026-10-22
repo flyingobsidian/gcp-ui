@@ -19,6 +19,10 @@ export interface Pane {
   project: string;
   service: string;
   location: string;
+  // id identifies the pane on screen while the page is open (e.g. as a
+  // render key, so splitting a pane keeps the others' state). It is not
+  // part of the URL.
+  id?: string;
 }
 
 export interface Split {
@@ -171,4 +175,54 @@ export function withPane(layout: Layout, path: PanePath, p: Pane): Layout {
 
 export function samePane(a: Pane | undefined, b: Pane | undefined): boolean {
   return !!a && !!b && a.project === b.project && a.service === b.service && a.location === b.location;
+}
+
+let lastPaneId = 0;
+
+export function newPaneId(): string {
+  return `pane-${++lastPaneId}`;
+}
+
+// withIds gives every pane in layout an id.
+export function withIds(layout: Layout): Layout {
+  if (layout.kind === "pane") return layout.id ? layout : { ...layout, id: newPaneId() };
+  return { ...layout, children: layout.children.map(withIds) };
+}
+
+export function panesOf(layout: Layout): Pane[] {
+  return layout.kind === "pane" ? [layout] : layout.children.flatMap(panesOf);
+}
+
+export function findPane(layout: Layout, id: string): Pane | undefined {
+  return panesOf(layout).find((p) => p.id === id);
+}
+
+// updatePane returns layout with pane id replaced by f(pane).
+export function updatePane(layout: Layout, id: string, f: (p: Pane) => Pane): Layout {
+  if (layout.kind === "pane") return layout.id === id ? f(layout) : layout;
+  return { ...layout, children: layout.children.map((c) => updatePane(c, id, f)) };
+}
+
+// splitPane replaces pane id with a split holding it and a copy (same
+// project, service and location) with id newId; "row" puts the copy to the
+// right, "col" below.
+export function splitPane(layout: Layout, id: string, dir: "row" | "col", newId: string): Layout {
+  return replaceNode(layout, id, (p) => ({ kind: "split", dir, children: [p, { ...p, id: newId }] }));
+}
+
+function replaceNode(layout: Layout, id: string, f: (p: Pane) => Layout): Layout {
+  if (layout.kind === "pane") return layout.id === id ? f(layout) : layout;
+  return { ...layout, children: layout.children.map((c) => replaceNode(c, id, f)) };
+}
+
+// closePane removes pane id. A split left with one child is replaced by that
+// child. The last remaining pane cannot be closed: layout is returned as is.
+export function closePane(layout: Layout, id: string): Layout {
+  if (layout.kind === "pane") return layout;
+  const i = layout.children.findIndex((c) => c.kind === "pane" && c.id === id);
+  if (i === -1) return { ...layout, children: layout.children.map((c) => closePane(c, id)) };
+  const children = layout.children.filter((_, j) => j !== i);
+  if (children.length === 1) return children[0]!;
+  const sizes = layout.sizes?.filter((_, j) => j !== i);
+  return sizes ? { ...layout, children, sizes } : { kind: "split", dir: layout.dir, children };
 }
