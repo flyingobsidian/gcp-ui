@@ -1,4 +1,5 @@
 import type { CellLinker } from "../consoleLinks.ts";
+import { defaultsFor } from "../tableDefaults.ts";
 import type { TablePrefs } from "../tablePrefs.ts";
 import { DataTable } from "./DataTable.tsx";
 
@@ -23,7 +24,8 @@ export function JsonView({ value, prefs, table, project, linkFor }: Props) {
     }
     // Keyed by table: the filter survives a project switch but resets when
     // a different kind of table is shown.
-    return <DataTable key={table} rows={value} columns={cols} prefs={prefs} table={table} project={project} linkFor={linkFor} />;
+    return <DataTable key={table} rows={value} columns={cols} prefs={prefs} table={table} project={project}
+      defaults={defaultsFor(table)} linkFor={linkFor} />;
   }
   return <pre>{typeof value === "string" ? value : JSON.stringify(value, null, 2)}</pre>;
 }

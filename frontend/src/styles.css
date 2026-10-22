@@ -96,6 +96,24 @@ table.data .cell { overflow: hidden; text-overflow: ellipsis; white-space: nowra
 .table-filter { width: 28ch; }
 .filter-count { font-size: 0.85em; }
 .no-match { padding: 6px 0; }
+table.data th.menu-cell, table.data td.menu-cell { padding: 0 4px 0 0; width: 1.6em; cursor: default; }
+.column-menu { position: relative; }
+.column-menu-button { border: none; background: none; padding: 0 4px; color: var(--muted); }
+.column-menu-button:hover, .column-menu-button[aria-expanded="true"] { color: var(--fg); }
+.column-menu-popup {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 22ch; max-height: 60vh; overflow: auto;
+  background: var(--bg); border: 1px solid var(--accent); box-shadow: 0 6px 24px rgb(0 0 0 / 0.5); padding: 4px 0;
+  color: var(--fg); cursor: default;
+}
+.column-menu-actions { display: flex; gap: 12px; padding: 2px 10px 6px; border-bottom: 1px solid var(--border); }
+.column-menu-actions .link { border: none; background: none; padding: 0; color: var(--muted); font-size: 0.85em; }
+.column-menu-actions .link:hover { color: var(--fg); }
+.column-menu-popup label { display: flex; gap: 6px; align-items: center; padding: 2px 10px; cursor: pointer; white-space: nowrap; }
+.column-menu-popup label:hover { background: var(--hover); }
+.row-action { border: none; background: none; padding: 0 0 0 6px; color: var(--muted); cursor: pointer; }
+.row-action:hover { color: var(--accent); }
+.row-action.copied { color: #3fb950; }
+.row-action.failed { color: var(--error); }
 .reset-layout { border: none; background: none; color: var(--muted); padding: 0; font-size: 0.85em; }
 .reset-layout:hover { color: var(--fg); }
 td a { color: var(--accent); text-decoration: none; }

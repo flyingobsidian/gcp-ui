@@ -67,8 +67,11 @@ export class TablePrefs {
     this.save();
   }
 
-  setVisible(table: string, visible: string[]): void {
-    this.data.layouts[table] = { ...this.layout(table), visible };
+  // setVisible records the columns to show; undefined returns to the
+  // table's defaults.
+  setVisible(table: string, visible: string[] | undefined): void {
+    const { order, widths } = this.layout(table);
+    this.data.layouts[table] = visible ? { order, widths, visible } : { order, widths };
     this.save();
   }
 

@@ -1,8 +1,12 @@
-import { useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { CellLinker } from "../consoleLinks.ts";
 import { highlight } from "../search.ts";
+import { displayColumns, displayRow, type RowAction, type TableDefaults } from "../tableDefaults.ts";
 import { cellText, filterRows } from "../tableFilter.ts";
-import { clampWidth, moveColumn, nextSort, orderColumns, sortRows, type TablePrefs } from "../tablePrefs.ts";
+import {
+  clampWidth, moveColumn, nextSort, orderColumns, sortRows, toggleColumn, visibleColumns, type TablePrefs,
+} from "../tablePrefs.ts";
+import { ColumnMenu } from "./ColumnMenu.tsx";
 
 type Row = Record<string, unknown>;
 
@@ -14,6 +18,7 @@ interface Props {
   // remembered layout; project scopes the remembered sort.
   table: string;
   project: string;
+  defaults?: TableDefaults;
   linkFor?: CellLinker;
 }
 
@@ -24,10 +29,13 @@ interface Drag {
 }
 
 // DataTable is a results table whose columns can be sorted (click a header),
-// resized (drag a header's right edge) and reordered (drag a header). The
-// filter box above it hides rows not matching the typed text, which is
-// highlighted in the rows that remain.
-export function DataTable({ rows, columns, prefs, table, project, linkFor }: Props) {
+// resized (drag a header's right edge), reordered (drag a header) and shown
+// or hidden (the ☰ menu). The filter box above it hides rows not matching the
+// typed text, which is highlighted in the rows that remain.
+//
+// Cells show display values (see tableDefaults), which are also what sorting
+// and filtering use; console links and row actions get the raw gcloud row.
+export function DataTable({ rows, columns, prefs, table, project, defaults, linkFor }: Props) {
   // prefs is not reactive; bump re-renders after changes.
   const [, setVersion] = useState(0);
   const bump = () => setVersion((v) => v + 1);
@@ -35,11 +43,30 @@ export function DataTable({ rows, columns, prefs, table, project, linkFor }: Pro
   const [drag, setDrag] = useState<Drag | null>(null);
   const resizing = useRef(false);
   const [filter, setFilter] = useState("");
+  const [copied, setCopied] = useState<{ key: string; ok: boolean } | null>(null);
+
+  // Display rows, plus a map back to the raw row each came from.
+  const [view, rawOf] = useMemo(() => {
+    const raw = new WeakMap<Row, Row>();
+    const shown = rows.map((r) => {
+      const d = displayRow(r, defaults);
+      raw.set(d, r);
+      return d;
+    });
+    return [shown, raw] as const;
+  }, [rows, defaults]);
+
+  useEffect(() => {
+    if (!copied) return;
+    const t = setTimeout(() => setCopied(null), 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
 
   const layout = prefs.layout(table);
-  const cols = orderColumns(columns, layout.order);
+  const allCols = orderColumns(displayColumns(columns, defaults), layout.order.length ? layout.order : defaults?.columns ?? []);
+  const cols = visibleColumns(allCols, layout.visible, defaults?.columns);
   const sort = prefs.sort(project, table);
-  const shown = filterRows(rows, cols, filter);
+  const shown = filterRows(view, cols, filter);
   const sorted = sortRows(shown, sort && cols.includes(sort.column) ? sort : undefined);
   const widthOf = (c: string) => (liveWidth?.column === c ? liveWidth.width : layout.widths[c]);
 
@@ -83,12 +110,18 @@ export function DataTable({ rows, columns, prefs, table, project, linkFor }: Pro
   const onDrop = (e: DragEvent, target: string) => {
     e.preventDefault();
     if (drag && drag.column !== target) {
-      prefs.setOrder(table, moveColumn(cols, drag.column, target, dropSide(e)));
+      prefs.setOrder(table, moveColumn(allCols, drag.column, target, dropSide(e)));
     }
     setDrag(null);
   };
 
-  const customised = layout.order.length > 0 || Object.keys(layout.widths).length > 0;
+  const runAction = async (action: RowAction, raw: Row, key: string) => {
+    const text = action.copyText(raw, project);
+    if (!text) return;
+    setCopied({ key, ok: await copyToClipboard(text) });
+  };
+
+  const customised = layout.order.length > 0 || Object.keys(layout.widths).length > 0 || layout.visible !== undefined;
 
   return (
     <>
@@ -106,9 +139,10 @@ export function DataTable({ rows, columns, prefs, table, project, linkFor }: Pro
         />
         <span class="muted filter-count">
           {filter.trim() ? `${shown.length} of ${rows.length} rows` : `${rows.length} rows`}
+          {cols.length < allCols.length ? ` · ${cols.length} of ${allCols.length} columns` : ""}
         </span>
         {customised && (
-          <button type="button" class="link reset-layout" title="Restore default column order and widths"
+          <button type="button" class="link reset-layout" title="Restore default columns, order and widths"
             onClick={() => { prefs.resetLayout(table); bump(); }}>
             reset columns
           </button>
@@ -117,6 +151,16 @@ export function DataTable({ rows, columns, prefs, table, project, linkFor }: Pro
       <table class="data">
         <thead>
           <tr>
+            <th class="menu-cell">
+              <ColumnMenu
+                columns={allCols}
+                visible={cols}
+                hasDefaults={!!defaults}
+                onToggle={(c) => { prefs.setVisible(table, toggleColumn(cols, c)); bump(); }}
+                onShowAll={() => { prefs.setVisible(table, [...allCols]); bump(); }}
+                onDefaults={() => { prefs.setVisible(table, undefined); bump(); }}
+              />
+            </th>
             {cols.map((c) => {
               const dir = sort?.column === c ? sort.dir : undefined;
               const w = widthOf(c);
@@ -158,27 +202,47 @@ export function DataTable({ rows, columns, prefs, table, project, linkFor }: Pro
           </tr>
         </thead>
         <tbody>
-          {sorted.map((row, i) => (
-            <tr key={i}>
-              {cols.map((c) => {
-                const text = cellText(row[c]);
-                const content = filter.trim() ? <Highlighted text={text} query={filter} /> : text;
-                const href = text ? linkFor?.(row, c) : undefined;
-                const w = widthOf(c);
-                return (
-                  <td key={c}>
-                    <div class="cell" style={w ? { width: `${w}px` } : undefined} title={w ? text : undefined}>
-                      {href
-                        ? <a href={href} target="_blank" rel="noopener noreferrer" title="Open in Google Cloud console">{content}</a>
-                        : content}
-                    </div>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+          {sorted.map((row, i) => {
+            const raw = rawOf.get(row) ?? row;
+            return (
+              <tr key={i}>
+                <td class="menu-cell" />
+                {cols.map((c) => {
+                  const text = cellText(row[c]);
+                  const content = filter.trim() ? <Highlighted text={text} query={filter} /> : text;
+                  const href = text ? linkFor?.(raw, c) : undefined;
+                  const w = widthOf(c);
+                  const actions = (defaults?.actions?.[c] ?? []).filter((a) => a.copyText(raw, project) !== undefined);
+                  return (
+                    <td key={c}>
+                      <div class="cell" style={w ? { width: `${w}px` } : undefined} title={w ? text : undefined}>
+                        {href
+                          ? <a href={href} target="_blank" rel="noopener noreferrer" title="Open in Google Cloud console">{content}</a>
+                          : content}
+                        {actions.map((a, j) => {
+                          const key = `${i}:${c}:${j}`;
+                          const done = copied?.key === key ? copied : undefined;
+                          return (
+                            <button
+                              key={j}
+                              type="button"
+                              class={`row-action ${done ? (done.ok ? "copied" : "failed") : ""}`}
+                              title={done ? (done.ok ? "Copied" : "Could not copy to the clipboard") : a.title}
+                              onClick={() => runAction(a, raw, key)}
+                            >
+                              {done ? (done.ok ? "✓" : "✗") : a.icon}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
           {sorted.length === 0 && (
-            <tr><td class="muted no-match" colSpan={cols.length}>no rows match “{filter.trim()}”</td></tr>
+            <tr><td class="muted no-match" colSpan={cols.length + 1}>no rows match “{filter.trim()}”</td></tr>
           )}
         </tbody>
       </table>
@@ -188,4 +252,23 @@ export function DataTable({ rows, columns, prefs, table, project, linkFor }: Pro
 
 function Highlighted({ text, query }: { text: string; query: string }) {
   return <>{highlight(text, query).map((seg, i) => (seg.hit ? <mark key={i}>{seg.text}</mark> : seg.text))}</>;
+}
+
+// copyToClipboard uses the async clipboard API (available because the UI is
+// served from localhost, a secure context), falling back to execCommand.
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  }
 }
