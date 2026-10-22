@@ -184,3 +184,25 @@ which opens in a new tab. The links are defined per service in
 - Links are built from the command that produced the output, not from
   whatever is currently typed.
 - Values from rows are URI-encoded one path segment at a time.
+
+## Result tables
+
+- **Sort:** click a column header to cycle ascending ▲, descending ▼, then off.
+  Numbers sort numerically and text sorts naturally (`vm-2` before `vm-10`).
+  Empty cells always go last.
+- **Resize:** drag the right edge of a header. Long values are cut off with
+  `…`; hover to see them in full.
+- **Reorder:** drag a header onto another column.
+- **reset columns** (above the table) restores the default order and widths.
+
+Arrangements are saved in `localStorage`:
+
+| Setting | Remembered per |
+|---|---|
+| Sort | project and table, e.g. VMs in `prod-a` can sort by zone while MIGs sort by name |
+| Column order and widths | table, shared by every project |
+
+A table is identified by its catalogue service (VMs, MIGs, …). For hand-typed
+commands it is identified by the command words without flags, so
+`compute instances list --filter=…` shares a layout with
+`compute instances list`.
