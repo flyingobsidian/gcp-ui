@@ -48,6 +48,12 @@ ul { list-style: none; margin: 0; padding: 0; }
 .icon { width: 2.4em; padding: 0; }
 .popup-body { overflow: auto; flex: 1; min-height: 0; }
 .service-box { width: 22ch; }
+.picker:has(.copy-project) { display: flex; align-items: center; }
+.copy-project { border: none; background: none; padding: 0 4px; color: var(--muted); }
+.copy-project:hover:not(:disabled) { color: var(--accent); }
+.copy-project:disabled { opacity: 0.3; }
+.copy-project.copied { color: #3fb950; }
+.copy-project.failed { color: var(--error); }
 .service { display: flex; align-items: baseline; gap: 0.8em; padding: 3px 4px 3px 10px; cursor: pointer; }
 .service:hover { background: var(--hover); }
 .service.selected { background: var(--selected); }

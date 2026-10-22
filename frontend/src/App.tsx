@@ -4,6 +4,7 @@ import { splitArgs } from "./args.ts";
 import { CommandPane } from "./components/CommandPane.tsx";
 import { ProjectPicker } from "./components/ProjectPicker.tsx";
 import { ServicePicker } from "./components/ServicePicker.tsx";
+import { RecentProjects } from "./recentProjects.ts";
 import { ResultCache } from "./resultCache.ts";
 import { ServicePrefs } from "./servicePrefs.ts";
 import { TablePrefs } from "./tablePrefs.ts";
@@ -32,6 +33,7 @@ export function App() {
   const [project, setProject] = useState(() => storage()?.getItem(SELECTED_KEY) ?? "");
   const [command, setCommand] = useState("");
   const results = useMemo(() => new ResultCache(storage()), []);
+  const recent = useMemo(() => new RecentProjects(storage()), []);
   const { state: run, run: runArgs, fail } = useGcloudRun(results);
   const projectBox = useRef<HTMLInputElement>(null);
   const serviceBox = useRef<HTMLInputElement>(null);
@@ -70,6 +72,7 @@ export function App() {
 
   const selectProject = (id: string) => {
     setProject(id);
+    recent.add(id);
     try {
       if (id) storage()?.setItem(SELECTED_KEY, id);
       else storage()?.removeItem(SELECTED_KEY);
@@ -102,7 +105,8 @@ export function App() {
     <div class="layout">
       <CommandPane
         pickers={<>
-          <ProjectPicker store={store} selected={project} onSelect={selectProject} onPicked={afterProjectPicked} boxRef={projectBox} />
+          <ProjectPicker store={store} selected={project} onSelect={selectProject} onPicked={afterProjectPicked} boxRef={projectBox}
+            recent={recent.ids} />
           <ServicePicker prefs={prefs} selected={current?.service} onPick={pickService} boxRef={serviceBox} />
         </>}
         command={command}

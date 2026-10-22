@@ -1,5 +1,6 @@
 import type { ComponentChildren, RefObject } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
+import { copyToClipboard } from "../clipboard.ts";
 import type { Container, Project } from "../hierarchy.ts";
 import { highlight, MAX_RESULTS, searchProjects } from "../search.ts";
 import { ORPHANS, type HierarchyStore } from "../store.ts";
@@ -13,21 +14,38 @@ interface Props {
   // onPicked runs after a project is picked (not cleared), e.g. to move focus on.
   onPicked?: () => void;
   boxRef?: RefObject<HTMLInputElement | null>;
+  // recent lists recently picked project IDs, newest first.
+  recent: readonly string[];
 }
 
-type Tab = "search" | "tree";
+type Tab = "recent" | "search" | "tree";
 
-// ProjectPicker is a single box showing the chosen project. Focusing or
-// typing in it opens a popup with two tabs: filtered search results and the
+// ProjectPicker is a single box showing the chosen project, with a button to
+// copy its ID. Focusing or typing in the box opens a popup with three tabs:
+// recently picked projects, filtered search results and the
 // organization/folder tree.
-export function ProjectPicker({ store, selected, onSelect, onPicked, boxRef }: Props) {
+export function ProjectPicker({ store, selected, onSelect, onPicked, boxRef, recent }: Props) {
   useStore(store);
-  const p = usePopup<Tab>("tree", boxRef);
+  const p = usePopup<Tab>(recent.length > 0 ? "recent" : "tree", boxRef);
   const [active, setActive] = useState(0);
+  const [copied, setCopied] = useState<boolean | null>(null);
 
   const projects = store.allProjects.data ?? [];
   const matches = useMemo(() => searchProjects(projects, p.query), [projects, p.query]);
-  useEffect(() => setActive(0), [p.query]);
+  // Recent IDs no longer in the project list (deleted, or access removed)
+  // still show, as bare IDs.
+  const recentProjects = useMemo(() => {
+    const byId = new Map(projects.map((x) => [x.projectId, x]));
+    return recent.map((id): Project => byId.get(id) ?? { kind: "project", key: `projects/${id}`, projectId: id, displayName: id, number: "", parent: "" });
+  }, [projects, recent]);
+  const items = p.tab === "search" ? matches.map((m) => m.project) : p.tab === "recent" ? recentProjects : [];
+  useEffect(() => setActive(0), [p.query, p.tab]);
+
+  useEffect(() => {
+    if (copied === null) return;
+    const t = setTimeout(() => setCopied(null), 1500);
+    return () => clearTimeout(t);
+  }, [copied]);
 
   // "/" focuses the box from anywhere outside a text field.
   useEffect(() => {
@@ -52,7 +70,7 @@ export function ProjectPicker({ store, selected, onSelect, onPicked, boxRef }: P
   const onInput = (value: string) => {
     p.setOpen(true);
     p.setQuery(value);
-    p.setTab(value.trim() ? "search" : "tree");
+    p.setTab(value.trim() ? "search" : recent.length > 0 ? "recent" : "tree");
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -60,14 +78,14 @@ export function ProjectPicker({ store, selected, onSelect, onPicked, boxRef }: P
     if (e.key === "Enter") {
       // Never let Enter submit the surrounding command form.
       e.preventDefault();
-      const m = p.tab === "search" ? matches[active] : undefined;
-      if (m) choose(m.project.projectId);
+      const item = items[active];
+      if (item) choose(item.projectId);
       return;
     }
-    if (p.tab !== "search") return;
+    if (p.tab === "tree") return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((i) => Math.min(i + 1, matches.length - 1));
+      setActive((i) => Math.min(i + 1, items.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive((i) => Math.max(i - 1, 0));
@@ -93,10 +111,25 @@ export function ProjectPicker({ store, selected, onSelect, onPicked, boxRef }: P
         spellcheck={false}
         autocomplete="off"
       />
+      <button
+        type="button"
+        class={`copy-project ${copied === null ? "" : copied ? "copied" : "failed"}`}
+        tabIndex={-1}
+        disabled={!selected}
+        title={copied === null ? (selected ? `Copy ${selected} to the clipboard` : "No project selected") : copied ? "Copied" : "Could not copy to the clipboard"}
+        aria-label="Copy project ID"
+        onClick={async () => setCopied(await copyToClipboard(selected))}
+      >
+        {copied === null ? "⧉" : copied ? "✓" : "✗"}
+      </button>
       {p.open && (
         <div class="popup">
           <PopupTabs<Tab>
-            tabs={[{ id: "search", label: `Search${p.query.trim() ? ` (${matches.length})` : ""}` }, { id: "tree", label: "Tree" }]}
+            tabs={[
+              { id: "recent", label: "Recent" },
+              { id: "search", label: `Search${p.query.trim() ? ` (${matches.length})` : ""}` },
+              { id: "tree", label: "Tree" },
+            ]}
             tab={p.tab}
             onTab={p.showTab}
           >
@@ -108,7 +141,15 @@ export function ProjectPicker({ store, selected, onSelect, onPicked, boxRef }: P
             </button>
           </PopupTabs>
           <div class="popup-body">
-            {p.tab === "search"
+            {p.tab === "recent"
+              ? (recentProjects.length
+                ? (
+                  <ul class="results">
+                    <ProjectList store={store} query="" projects={recentProjects} active={active} selected={selected} onPick={(x) => choose(x.projectId)} />
+                  </ul>
+                )
+                : <p class="muted pad">projects you pick will be listed here</p>)
+              : p.tab === "search"
               ? (p.query.trim()
                 ? <SearchResults store={store} query={p.query} matches={matches.map((m) => m.project)} active={active} selected={selected} onPick={(x) => choose(x.projectId)} />
                 : <p class="muted pad">type to filter {projects.length} projects by ID or name</p>)
@@ -129,7 +170,21 @@ function SearchResults(props: {
   if (matches.length === 0) return <p class="muted pad">no matching projects</p>;
   return (
     <ul class="results">
-      {matches.map((p, i) => (
+      <ProjectList store={store} query={query} projects={matches} active={active} selected={selected} onPick={onPick} />
+      {matches.length === MAX_RESULTS && <li class="muted pad">showing first {MAX_RESULTS}; keep typing to narrow</li>}
+    </ul>
+  );
+}
+
+// ProjectList renders project rows (ID, display name, folder path) with the
+// keyboard-active row scrolled into view.
+function ProjectList(props: {
+  store: HierarchyStore; query: string; projects: Project[]; active: number; selected: string; onPick: (p: Project) => void;
+}) {
+  const { store, query, projects, active, selected, onPick } = props;
+  return (
+    <>
+      {projects.map((p, i) => (
         <li
           key={p.key}
           class={`result ${i === active ? "active" : ""} ${p.projectId === selected ? "selected" : ""}`}
@@ -141,8 +196,7 @@ function SearchResults(props: {
           <div class="result-path">{store.pathOf(p)}</div>
         </li>
       ))}
-      {matches.length === MAX_RESULTS && <li class="muted pad">showing first {MAX_RESULTS}; keep typing to narrow</li>}
-    </ul>
+    </>
   );
 }
 
