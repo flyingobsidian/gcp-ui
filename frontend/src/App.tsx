@@ -5,6 +5,7 @@ import { CommandPane } from "./components/CommandPane.tsx";
 import { ProjectPicker } from "./components/ProjectPicker.tsx";
 import { ServicePicker } from "./components/ServicePicker.tsx";
 import { ServicePrefs } from "./servicePrefs.ts";
+import { TablePrefs } from "./tablePrefs.ts";
 import { buildCommand, catalogueCommand, type Service } from "./services.ts";
 import { HierarchyStore } from "./store.ts";
 import { useGcloudRun } from "./useGcloudRun.ts";
@@ -26,6 +27,7 @@ export function App() {
     return s;
   }, []);
   const prefs = useMemo(() => new ServicePrefs(storage()), []);
+  const tablePrefs = useMemo(() => new TablePrefs(storage()), []);
   const [project, setProject] = useState(() => storage()?.getItem(SELECTED_KEY) ?? "");
   const [command, setCommand] = useState("");
   const { state: run, run: runArgs, fail } = useGcloudRun();
@@ -103,6 +105,7 @@ export function App() {
         onRun={() => execute(command, project)}
         run={run}
         commandRef={commandBox}
+        tablePrefs={tablePrefs}
       />
     </div>
   );

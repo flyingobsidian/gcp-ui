@@ -82,5 +82,17 @@ table { border-collapse: collapse; width: max-content; }
 th, td { text-align: left; padding: 2px 10px 2px 0; border-bottom: 1px solid var(--border); white-space: nowrap; }
 th { color: var(--muted); font-weight: normal; position: sticky; top: 0; background: var(--bg); }
 pre { margin: 0; white-space: pre-wrap; }
+table.data th { position: sticky; top: 0; cursor: pointer; user-select: none; padding-right: 14px; }
+table.data th:hover { color: var(--fg); }
+table.data th.sorted { color: var(--fg); }
+table.data th.dragging { opacity: 0.4; }
+table.data th.drop-before { box-shadow: inset 2px 0 0 var(--accent); }
+table.data th.drop-after { box-shadow: inset -2px 0 0 var(--accent); }
+table.data .cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sort-mark { color: var(--accent); font-size: 0.8em; }
+.resize { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; }
+.resize:hover, .resize:active { background: linear-gradient(to right, transparent 3px, var(--accent) 3px, var(--accent) 5px, transparent 5px); }
+.reset-layout { border: none; background: none; color: var(--muted); padding: 0 0 4px; font-size: 0.85em; }
+.reset-layout:hover { color: var(--fg); }
 td a { color: var(--accent); text-decoration: none; }
 td a:hover { text-decoration: underline; }
