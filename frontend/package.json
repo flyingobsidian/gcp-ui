@@ -1,0 +1,19 @@
+{
+  "name": "gcp-ui-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "preact": "11.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}
