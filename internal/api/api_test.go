@@ -106,7 +106,6 @@ func TestRunErrors(t *testing.T) {
 		{"exit status", &gcloud.Error{Cause: gcloud.CauseExitStatus, Result: gcloud.Result{Stderr: "ERROR: denied", ExitCode: 1}}, http.StatusBadGateway, "exit_status"},
 		{"invalid", &gcloud.Error{Cause: gcloud.CauseInvalidRequest}, http.StatusBadRequest, "invalid_request"},
 		{"timeout", &gcloud.Error{Cause: gcloud.CauseTimeout}, http.StatusGatewayTimeout, "timeout"},
-		{"start failed", &gcloud.Error{Cause: gcloud.CauseStartFailed}, http.StatusInternalServerError, "start_failed"},
 		{"unexpected", io.ErrUnexpectedEOF, http.StatusInternalServerError, "internal"},
 	}
 	for _, tt := range tests {

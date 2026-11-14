@@ -245,9 +245,6 @@ func (s *server) writeResult(w http.ResponseWriter, res gcloud.Result, err error
 		code := gerr.Result.ExitCode
 		body.ExitCode = &code
 	}
-	if gerr.Cause == gcloud.CauseStartFailed {
-		s.logger.Error("gcloud failed to start", "err", gerr)
-	}
 	writeError(w, statusFor(gerr.Cause), body)
 }
 

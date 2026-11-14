@@ -1,7 +1,7 @@
 // Command gcp-ui serves a localhost-only web UI for GCP and an API that passes
 // commands through to gcloud with JSON output. gcloud is gcloud-go, linked
-// into this binary: each command runs in a re-executed copy of gcp-ui (see
-// internal/gcloudgo).
+// into this binary as a library: commands run concurrently inside the server
+// process (see internal/gcloud).
 package main
 
 import (
@@ -18,10 +18,11 @@ import (
 	"syscall"
 	"time"
 
+	gcloudgo "github.com/flyingobsidian/gcloud-go/gcloud"
+
 	"github.com/flyingobsidian/gcp-ui/internal/api"
 	"github.com/flyingobsidian/gcp-ui/internal/config"
 	"github.com/flyingobsidian/gcp-ui/internal/gcloud"
-	"github.com/flyingobsidian/gcp-ui/internal/gcloudgo"
 	"github.com/flyingobsidian/gcp-ui/internal/httpmw"
 	"github.com/flyingobsidian/gcp-ui/internal/session"
 	"github.com/flyingobsidian/gcp-ui/internal/web"
@@ -30,9 +31,6 @@ import (
 const shutdownTimeout = 5 * time.Second
 
 func main() {
-	if gcloudgo.IsChild() {
-		os.Exit(gcloudgo.Main())
-	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "gcp-ui:", err)
 		os.Exit(1)
@@ -49,17 +47,13 @@ func run() error {
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
-	self, err := gcloudgo.Executable()
-	if err != nil {
-		return err
-	}
 	token, err := session.NewToken()
 	if err != nil {
 		return err
 	}
 	cookieName := session.CookieName(cfg.APIPort)
 
-	runner := gcloud.NewRunner(self, gcloudgo.ChildEnv(), cfg.CommandTimeout, cfg.MaxConcurrent)
+	runner := gcloud.NewRunner(gcloud.NewLibrary(logger).Execute, cfg.CommandTimeout, cfg.MaxConcurrent)
 	apiHandler := api.NewHandler(runner, api.Options{
 		Token:          token,
 		CookieName:     cookieName,

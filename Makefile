@@ -19,7 +19,7 @@ GCLOUD_GO_VERSION = $(shell go list -m -f '{{if .Version}}{{.Version}}{{else}}lo
 build: frontend go-build
 
 go-build:
-	CGO_ENABLED=0 go build -ldflags="-s -w -X $(GCLOUD_GO)/cmd.Version=$(GCLOUD_GO_VERSION)" -o bin/$(BINARY) .
+	CGO_ENABLED=0 go build -ldflags="-s -w -X $(GCLOUD_GO)/internal/cli.Version=$(GCLOUD_GO_VERSION)" -o bin/$(BINARY) .
 
 gcloud-go-local:
 	@test -f $(GCLOUD_GO_DIR)/go.mod || (echo "no gcloud-go checkout at $(GCLOUD_GO_DIR); set GCLOUD_GO_DIR"; exit 1)

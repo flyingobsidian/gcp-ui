@@ -10,7 +10,6 @@ const (
 	CauseTimeout        Cause = "timeout"
 	CauseCancelled      Cause = "cancelled"
 	CauseOutputTooLarge Cause = "output_too_large"
-	CauseStartFailed    Cause = "start_failed"
 )
 
 // Error is returned by Runner.Run for every failure. Result carries whatever

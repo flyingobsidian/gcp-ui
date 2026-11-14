@@ -3,38 +3,41 @@ package gcloud
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
+	"fmt"
+	"io"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
-// fakeGcloud writes a shell script standing in for gcloud. Its behaviour is
-// selected by the first argument so each test controls the outcome.
-func fakeGcloud(t *testing.T) string {
-	t.Helper()
-	script := `#!/bin/sh
-case "$1" in
-  echo)    printf '%s\n' "$@" ;;
-  json)    printf '[{"name":"vm-1"}]' ;;
-  fail)    echo "ERROR: permission denied" >&2; exit 3 ;;
-  sleep)   exec sleep 10 ;;
-  flood)   while :; do echo xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx; done ;;
-  prompts) printf '%s' "$CLOUDSDK_CORE_DISABLE_PROMPTS" ;;
-  env)     printf '%s' "$GCPUI_TEST_EXTRA" ;;
-esac
-`
-	path := filepath.Join(t.TempDir(), "gcloud")
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatalf("write fake gcloud: %v", err)
+// fakeExec stands in for gcloud-go. Its behaviour is selected by the first
+// argument so each test controls the outcome.
+func fakeExec(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	switch args[0] {
+	case "echo":
+		fmt.Fprint(stdout, strings.Join(args, "\n"))
+	case "json":
+		fmt.Fprint(stdout, `[{"name":"vm-1"}]`)
+	case "fail":
+		fmt.Fprintln(stderr, "ERROR: permission denied")
+		return 3
+	case "sleep":
+		<-ctx.Done()
+		return 1
+	case "flood":
+		for ctx.Err() == nil {
+			fmt.Fprintln(stdout, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+		}
+		return 1
 	}
-	return path
+	return 0
 }
 
 func TestRunSuccess(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), nil, 5*time.Second, 2)
+	r := NewRunner(fakeExec, 5*time.Second, 2)
 	res, err := r.Run(context.Background(), Request{Args: []string{"json"}})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -45,42 +48,19 @@ func TestRunSuccess(t *testing.T) {
 }
 
 func TestRunInjectsFlags(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), nil, 5*time.Second, 2)
+	r := NewRunner(fakeExec, 5*time.Second, 2)
 	res, err := r.Run(context.Background(), Request{Args: []string{"echo", "list", "--", "x"}, Project: "my-project-1"})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	got := strings.Split(strings.TrimSpace(string(res.Stdout)), "\n")
+	got := strings.Split(string(res.Stdout), "\n")
 	want := []string{"echo", "list", "--format=json", "--project=my-project-1", "--", "x"}
 	if !slices.Equal(got, want) {
 		t.Errorf("argv = %q, want %q", got, want)
 	}
 }
 
-func TestRunDisablesPrompts(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), nil, 5*time.Second, 2)
-	res, err := r.Run(context.Background(), Request{Args: []string{"prompts"}})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if string(res.Stdout) != "1" {
-		t.Errorf("CLOUDSDK_CORE_DISABLE_PROMPTS = %q, want 1", res.Stdout)
-	}
-}
-
-func TestRunAddsExtraEnv(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), []string{"GCPUI_TEST_EXTRA=yes"}, 5*time.Second, 2)
-	res, err := r.Run(context.Background(), Request{Args: []string{"env"}})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if string(res.Stdout) != "yes" {
-		t.Errorf("GCPUI_TEST_EXTRA = %q, want yes", res.Stdout)
-	}
-}
-
 func TestRunFailures(t *testing.T) {
-	gcloud := fakeGcloud(t)
 	tests := []struct {
 		name    string
 		args    []string
@@ -93,7 +73,7 @@ func TestRunFailures(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := NewRunner(gcloud, nil, tt.timeout, 1)
+			r := NewRunner(fakeExec, tt.timeout, 1)
 			r.maxStdout = 4096
 			_, err := r.Run(context.Background(), Request{Args: tt.args})
 			var gerr *Error
@@ -108,7 +88,7 @@ func TestRunFailures(t *testing.T) {
 }
 
 func TestRunExitStatusKeepsStderr(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), nil, 5*time.Second, 1)
+	r := NewRunner(fakeExec, 5*time.Second, 1)
 	_, err := r.Run(context.Background(), Request{Args: []string{"fail"}})
 	var gerr *Error
 	if !errors.As(err, &gerr) {
@@ -119,17 +99,19 @@ func TestRunExitStatusKeepsStderr(t *testing.T) {
 	}
 }
 
-func TestRunStartFailed(t *testing.T) {
-	r := NewRunner(filepath.Join(t.TempDir(), "missing"), nil, time.Second, 1)
-	_, err := r.Run(context.Background(), Request{Args: []string{"x"}})
+func TestRunCancelled(t *testing.T) {
+	r := NewRunner(fakeExec, 5*time.Second, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	_, err := r.Run(ctx, Request{Args: []string{"sleep"}})
 	var gerr *Error
-	if !errors.As(err, &gerr) || gerr.Cause != CauseStartFailed {
-		t.Errorf("got %v, want start_failed", err)
+	if !errors.As(err, &gerr) || gerr.Cause != CauseCancelled {
+		t.Errorf("got %v, want cancelled", err)
 	}
 }
 
 func TestRunCancelledWhileQueued(t *testing.T) {
-	r := NewRunner(fakeGcloud(t), nil, 5*time.Second, 1)
+	r := NewRunner(fakeExec, 5*time.Second, 1)
 	r.sem <- struct{}{} // occupy the only slot
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
@@ -137,6 +119,82 @@ func TestRunCancelledWhileQueued(t *testing.T) {
 	var gerr *Error
 	if !errors.As(err, &gerr) || gerr.Cause != CauseCancelled {
 		t.Errorf("got %v, want cancelled", err)
+	}
+}
+
+// A command that ignores cancellation is abandoned after abandonDelay, but
+// keeps its slot until it really returns.
+func TestRunAbandonsStuckCommand(t *testing.T) {
+	release := make(chan struct{})
+	returned := make(chan struct{})
+	stuck := func(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+		if args[0] != "stuck" {
+			return fakeExec(ctx, args, stdout, stderr)
+		}
+		defer close(returned)
+		fmt.Fprint(stderr, "partial")
+		<-release
+		fmt.Fprint(stderr, " output written after Run returned")
+		return 0
+	}
+	r := NewRunner(stuck, 50*time.Millisecond, 1)
+	r.abandonDelay = 50 * time.Millisecond
+
+	_, err := r.Run(context.Background(), Request{Args: []string{"stuck"}})
+	var gerr *Error
+	if !errors.As(err, &gerr) || gerr.Cause != CauseTimeout {
+		t.Fatalf("got %v, want timeout", err)
+	}
+	if gerr.Result.ExitCode != -1 || gerr.Result.Stderr != "partial" {
+		t.Errorf("unexpected result %+v", gerr.Result)
+	}
+
+	// The stuck command still holds the only slot.
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, err := r.Run(ctx, Request{Args: []string{"json"}}); !errors.As(err, &gerr) || gerr.Cause != CauseCancelled {
+		t.Errorf("second Run got %v, want cancelled while queued", err)
+	}
+
+	close(release)
+	<-returned
+	if _, err := r.Run(context.Background(), Request{Args: []string{"json"}}); err != nil {
+		t.Errorf("Run after the stuck command returned: %v", err)
+	}
+}
+
+func TestRunLimitsConcurrency(t *testing.T) {
+	const limit, runs = 3, 20
+	var running, peak atomic.Int32
+	counting := func(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+		n := running.Add(1)
+		defer running.Add(-1)
+		for {
+			p := peak.Load()
+			if n <= p || peak.CompareAndSwap(p, n) {
+				break
+			}
+		}
+		time.Sleep(5 * time.Millisecond)
+		return fakeExec(ctx, args, stdout, stderr)
+	}
+	r := NewRunner(counting, 5*time.Second, limit)
+	var wg sync.WaitGroup
+	for i := range runs {
+		wg.Go(func() {
+			res, err := r.Run(context.Background(), Request{Args: []string{"echo", fmt.Sprint(i)}})
+			if err != nil {
+				t.Errorf("Run %d: %v", i, err)
+				return
+			}
+			if want := fmt.Sprintf("echo\n%d\n--format=json", i); string(res.Stdout) != want {
+				t.Errorf("Run %d stdout %q, want %q", i, res.Stdout, want)
+			}
+		})
+	}
+	wg.Wait()
+	if p := peak.Load(); p > limit {
+		t.Errorf("%d commands ran at once, limit %d", p, limit)
 	}
 }
 
