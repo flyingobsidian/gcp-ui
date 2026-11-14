@@ -67,10 +67,11 @@ printed URL.
 - **Always inject** `--project=P --format=json --quiet`, and run with
   `CLOUDSDK_CORE_DISABLE_PROMPTS=1`. Never use `gcloud config set`: that's
   global state and would race between panes.
-- **Binary:** gcloud-go is linked in as a Go module and run in a re-executed
-  copy of gcp-ui (decided 2026-10-21; see README "gcloud"). It costs about
-  50 ms CPU per invocation. With 78 projects, process startup cost multiplies,
-  so gcloud-go matters a lot here.
+- **Binary:** gcloud-go is linked in as a Go module and its commands run
+  in-process and concurrently through its `gcloud` library package (decided
+  2026-11-14; see README "gcloud"). Until gcloud-go became safe for concurrent
+  use, each command ran in a re-executed copy of gcp-ui, at about 50 ms CPU
+  per invocation; with 78 projects, that startup cost multiplied.
 - **Cache:** key = (view, project, params). Serve stale-while-revalidate with a
   TTL per view: VMs/MIGs ~30 s, executions ~15 s, buckets/scheduler/workflows
   ~5 min, projects ~1 h. An in-memory LRU, plus an on-disk snapshot so a restart

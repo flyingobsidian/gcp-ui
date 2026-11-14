@@ -20,7 +20,7 @@ make run
 | `--api-port` | `GCPUI_API_PORT` | `32000` |
 | `--bind`     | `GCPUI_BIND`     | `127.0.0.1` (loopback only; anything else is refused) |
 | `--timeout`  | `GCPUI_TIMEOUT`  | `2m` per command |
-| `--max-concurrent` | `GCPUI_MAX_CONCURRENT` | `8` gcloud processes |
+| `--max-concurrent` | `GCPUI_MAX_CONCURRENT` | `8` gcloud commands at once |
 
 Flags override environment variables.
 
@@ -28,10 +28,17 @@ Flags override environment variables.
 
 gcp-ui does not use a `gcloud` from `$PATH`. It links
 [gcloud-go](https://github.com/flyingobsidian/gcloud-go) in as a Go module.
-Each command runs in a re-executed copy of the gcp-ui binary, in "gcloud-go
-mode", so commands still run as separate processes with their own timeout. That
-copy is `/proc/self/exe`, so it is always the same build as the running server.
-gcp-ui never accepts gcloud-go's offer to enable a disabled API.
+Commands run inside the gcp-ui process, concurrently, through gcloud-go's
+`gcloud` library package. They share one set of cached credentials, so an
+access token is fetched once rather than per command. In-process commands never
+prompt and never enable a disabled API.
+
+- **Timeouts:** a command that overruns `--timeout` is cancelled. If it hasn't
+  returned 5 seconds later, gcp-ui answers with `timeout` anyway, but the
+  command keeps its `--max-concurrent` slot until it does return.
+- **Credentials:** after a successful `auth` command, gcp-ui reloads stored
+  credentials. A credential replaced or revoked outside gcp-ui, for example by
+  `gcloud auth login` in a terminal, is picked up when gcp-ui restarts.
 
 | Command | Effect |
 |---|---|
@@ -40,8 +47,7 @@ gcp-ui never accepts gcloud-go's offer to enable a disabled API.
 | `make gcloud-go-local` | Build against the checkout in `../gcloud-go` (or `GCLOUD_GO_DIR=…`) using a gitignored `go.work` |
 | `make gcloud-go-versioned` | Remove `go.work` and go back to the version pinned in `go.mod` |
 
-The gcloud-go version is printed at startup, and is also what
-`GCPUI_RUN_GCLOUD_GO=1 bin/gcp-ui --version` reports.
+The gcloud-go version is printed at startup.
 
 gcloud-go's tags (e.g. `582.0.0`) are not Go module versions, so `go.mod`
 records a pseudo-version (`v0.0.0-<date>-<commit>`). `REF=582.0.0` still
@@ -78,7 +84,7 @@ GET /v1/healthz   (no token)
   either.
 - If stdout is not JSON, it is returned as text in `outputText`.
 - Error causes: `invalid_request`, `exit_status`, `timeout`, `cancelled`,
-  `output_too_large`, `start_failed`.
+  `output_too_large`.
 
 ## Security model
 
